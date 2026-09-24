@@ -1,15 +1,6 @@
-mod api;
-mod auth;
-mod cli;
-mod commands;
-mod config;
-mod db;
-mod error;
-mod models;
-mod output;
-
+use banker::cli::Cli;
+use banker::commands;
 use clap::Parser;
-use cli::Cli;
 
 #[tokio::main]
 async fn main() {
