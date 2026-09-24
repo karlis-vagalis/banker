@@ -21,31 +21,19 @@ Enable Banking and provider banks do not support Banker. For issues using this C
 - Print tables, line-delimited JSON (`--jsonl`), or pipe-friendly text (`--lines`).
 - Install an optional systemd user timer for periodic synchronization.
 
-## Requirements
-
-- Rust toolchain (edition 2024; install with [rustup](https://rustup.rs/)).
-- An Enable Banking application with its application ID and matching private key.
-- A bank supported by Enable Banking in your region.
-
 ## Installation
 
-Install the latest source from GitHub:
+Install the latest published version from crates.io with Cargo (requires Rust and Cargo):
 
 ```sh
-cargo install --git https://github.com/karlis-vagalis/banker.git
+cargo install banker
 ```
 
-Or build from a local checkout:
-
-```sh
-git clone https://github.com/karlis-vagalis/banker.git
-cd banker
-cargo install --path .
-```
-
-The crate is not yet published on crates.io.
+To update an existing Cargo installation, run `cargo install banker --force`. If you don't have a Rust toolchain, download a prebuilt Linux or Windows binary from the [latest GitHub Release](https://github.com/karlis-vagalis/banker/releases/latest); no toolchain is needed to run the binary.
 
 ## Configuration
+
+You'll need an Enable Banking application ID, its matching private key, and a bank supported by Enable Banking in your region.
 
 Create `~/.config/banker/config.toml` (or pass another path with `--config`). Keep this file and your private key out of version control. Replace the example values with your own Enable Banking application details and the actual ASPSP name/country returned by the service:
 
@@ -83,7 +71,7 @@ The configured key file must be the private key matching the Enable Banking appl
 ## Quick start
 
 ```sh
-# See available banks (requires one application in config, or pass --app)
+# List available banks (uses the sole configured application)
 banker bank --country DE
 
 # Start bank authorization; opens the authorization URL in your browser
@@ -93,8 +81,8 @@ banker auth login --bank mybank
 banker auth status
 # banker auth logout --bank mybank
 
-# Sync the last seven days (the default)
-banker sync
+# Sync a recent period explicitly; without a time frame, sync requests the longest available history
+banker sync --last 7d
 
 # Sync a specific period or all available history
 banker sync --from 2025-01-01 --to 2025-02-01
@@ -110,7 +98,7 @@ banker transaction list --jsonl
 banker account list --lines
 ```
 
-`--from` and `--to` accept `YYYY-MM-DD` dates or RFC 3339 timestamps. Alternatively, `--last` accepts durations such as `30d` or `1month`. Use `banker <command> --help` for the complete command options.
+`--from` and `--to` accept `YYYY-MM-DD` dates or RFC 3339 timestamps. Alternatively, `--last` accepts durations such as `30d` or `1month`. For `banker sync`, omitting a time-frame option requests the longest transaction history available; use `--last` or a bounded `--from`/`--to` range for a narrower sync. `--all` also requests the full available history. Use `banker <command> --help` for the complete command options.
 
 ### Metadata
 
@@ -133,11 +121,11 @@ Use `banker account metadata --help` (or the balance/transaction equivalents) fo
 
 ## Releasing
 
-The source manifest stays at version `0.0.0`. Install [`doxxer`](https://github.com/karlis-vagalis/doxxer), then run `just release` from a clean working tree to create and push the next `vX.Y.Z` tag on the current commit. The cargo-dist-generated GitHub workflow injects that tag's version while building the binaries; its crates.io publish job injects the same version before publishing.
-
-Before the first release, add a `CARGO_REGISTRY_TOKEN` secret to the GitHub repository. The release workflow creates a GitHub Release with Linux and Windows assets, then publishes the crate to crates.io.
+The source manifest stays at version `0.0.0`; release workflows derive the package version from the tag. To release, manually create and push a `vX.Y.Z` tag at the desired commit. GitHub Actions builds the Linux and Windows assets, creates a GitHub Release, and publishes the crate to crates.io using Trusted Publishing (GitHub OIDC) with the `crates-io` environment. No long-lived crates.io API token is required.
 
 ## Development
+
+Building and testing from source requires a Rust toolchain supporting edition 2024; install one with [rustup](https://rustup.rs/).
 
 ```sh
 cargo build
