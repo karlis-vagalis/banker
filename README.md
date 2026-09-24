@@ -1,8 +1,8 @@
 # Banker
 
-A command-line client for [Enable Banking](https://enablebanking.com/) that links to your banks, syncs account data, and lets you inspect it locally from a SQLite database.
-
 > **AI disclosure:** AI tools were used to assist with code and documentation in this repository. The maintainer reviews changes and is responsible for the project.
+
+A command-line client for [Enable Banking](https://enablebanking.com/) that links to your banks, syncs account data, and lets you inspect it locally from a SQLite database.
 
 > **Status:** Early-stage personal project. The CLI and configuration format may change. It is not affiliated with or endorsed by Enable Banking or any bank.
 
