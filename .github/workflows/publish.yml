@@ -23,15 +23,30 @@ jobs:
           ref: ${{ github.ref }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@just
+      - name: Check whether this version is already published
+        id: published
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          if cargo info "banker@${VERSION}" --registry crates-io >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
       - name: Set package version from release tag
+        if: steps.published.outputs.exists != 'true'
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: just --shell bash --shell-arg=-cu set-version "${RELEASE_TAG#v}"
         shell: bash
       - name: Authenticate with crates.io
+        if: steps.published.outputs.exists != 'true'
         id: auth
         uses: rust-lang/crates-io-auth-action@v1
       - name: Publish crate
+        if: steps.published.outputs.exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: cargo publish --locked
