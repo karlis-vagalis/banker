@@ -8,6 +8,10 @@ A command-line client for [Enable Banking](https://enablebanking.com/) that link
 
 > **Status:** Early-stage personal project. The CLI and configuration format may change. It is not affiliated with or endorsed by Enable Banking or any bank.
 
+## Why Banker?
+
+I built Banker to keep transactions locally for querying and lightweight bookkeeping, including categories, tags, and other metadata. Enable Banking provides standardized access to banks for syncing; the local data can also help AI agents analyze transactions and suggest or apply categories with LLMs.
+
 ## Support
 
 Enable Banking and provider banks do not support Banker. For issues using this CLI, please do not contact them; report the problem in the [Banker issue tracker](https://github.com/karlis-vagalis/banker/issues) with the command and a redacted error message. Never include private keys, session details, IBANs, or transaction data in an issue.
@@ -118,10 +122,6 @@ Use `banker account metadata --help` (or the balance/transaction equivalents) fo
 - The private key stays at the path configured by `key_file`; Banker reads it to authenticate API requests.
 - Syncing sends requests to Enable Banking and retrieves financial data from the providers you authorize. Treat the database, session file, configuration, and backups as sensitive. Protect them with appropriate filesystem permissions and disk encryption.
 - Banker is an early-stage project. Review the code and your provider's terms before connecting a real account; use it at your own risk.
-
-## Releasing
-
-The source manifest stays at version `0.0.0`; release workflows derive the package version from the tag. To release, manually create and push a `vX.Y.Z` tag at the desired commit. GitHub Actions builds the Linux and Windows assets, generates release notes from that tag's conventional commits using the default `cliff.toml` configuration (without checking in a changelog), creates a GitHub Release, and publishes the crate to crates.io using Trusted Publishing (GitHub OIDC) with the `crates-io` environment. No long-lived crates.io API token is required.
 
 ## Development
 
