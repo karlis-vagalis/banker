@@ -11,10 +11,10 @@ banker sync --from 2025-01-01 --to 2025-01-31
 ```
 
 - `--bank` takes a configured bank alias and may be repeated.
-- `--from` and `--to` must be supplied together. Accepts `YYYY-MM-DD` or RFC 3339 timestamps.
-- `--last` accepts durations such as `30d` or `1month`.
+- `--from` and `--to` must be supplied together. They accept `YYYY-MM-DD` or RFC 3339 timestamps, but only the UTC calendar dates are sent to Enable Banking.
+- `--last` accepts positive durations such as `30d` or `1month`.
 - `--all` explicitly requests the entire available history; it has the same broad-history effect as omitting the time frame.
 
 Before running a broad sync, tell the user which banks and range it will cover and get explicit confirmation. Prefer bounded ranges. A session may have limited access to older transactions; if old history is unavailable, check `banker auth status` and explain that reauthorization may be needed.
 
-If there are no sessions, guide the user through `banker auth login` using [the local authorization flow](setup-and-auth.md). Never ask them to share the redirect URL, session token, or private key.
+Sync exits nonzero when any selected session or account fails, even if other accounts were stored successfully. Check the summary before retrying; a nonzero exit does not mean that no data was saved. If there are no sessions, guide the user through `banker auth login` using [the local authorization flow](setup-and-auth.md). Never ask them to share the redirect URL, session token, or private key.

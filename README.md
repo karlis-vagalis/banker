@@ -98,7 +98,7 @@ banker transaction list --jsonl
 banker account list --lines
 ```
 
-`--from` and `--to` accept `YYYY-MM-DD` dates or RFC 3339 timestamps. Alternatively, `--last` accepts positive durations such as `30d` or `1month`. Omitting a time-frame option requests the longest transaction history available; use `--last` or a bounded `--from`/`--to` range for a narrower sync. `--all` also requests the full available history. Sync exits nonzero if any selected session or account fails, even when other accounts were stored successfully. Use `banker <command> --help` for the complete command options.
+`--from` and `--to` accept `YYYY-MM-DD` dates or RFC 3339 timestamps; only the UTC calendar date is sent to Enable Banking, so time-of-day precision is not preserved. Alternatively, `--last` accepts positive durations such as `30d` or `1month`. Omitting a time-frame option requests the longest transaction history available; use `--last` or a bounded `--from`/`--to` range for a narrower sync. `--all` also requests the full available history. Sync exits nonzero if any selected session or account fails, even when other accounts were stored successfully. Use `banker <command> --help` for the complete command options.
 
 ### Metadata
 
