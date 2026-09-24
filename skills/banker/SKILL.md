@@ -1,6 +1,6 @@
 ---
 name: banker
-description: "Help users operate the installed Banker CLI binary for Enable Banking: configure it, authorize banks, sync and inspect data, manage metadata, and troubleshoot commands. Use whenever the user asks how to use or operate banker; focus on binary CLI workflows, not direct SQLite querying."
+description: "Help users operate the installed Banker CLI binary for Enable Banking: configure it, authorize banks, sync and inspect data, manage metadata, and troubleshoot commands. Use whenever the user asks how to use or operate banker."
 ---
 
 # Banker CLI
