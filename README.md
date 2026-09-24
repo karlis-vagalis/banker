@@ -1,5 +1,7 @@
 # Banker
 
+[![skills.sh](https://skills.sh/b/karlis-vagalis/banker)](https://skills.sh/karlis-vagalis/banker)
+
 > **AI disclosure:** AI tools were used to assist with code and documentation in this repository. The maintainer reviews changes and is responsible for the project.
 
 A command-line client for [Enable Banking](https://enablebanking.com/) that links to your banks, syncs account data, and lets you inspect it locally from a SQLite database.
