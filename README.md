@@ -18,7 +18,7 @@ Enable Banking and provider banks do not support Banker. For issues using this C
 - Sync account details, balances, and transactions into a local SQLite database.
 - Browse local records or fetch individual resources from the API.
 - Add validated JSON metadata to accounts, balances, and transactions.
-- Print tables, line-delimited JSON (`--jsonl`), or pipe-friendly text (`--lines`).
+- Print tables, line-delimited JSON (`--jsonl`), or pipe-friendly text (`--lines`). Local JSONL records include `id`, timestamps, and bank data under `content`; balance/transaction records also include `account_id`.
 - Install an optional systemd user timer for periodic synchronization.
 
 ## Installation
@@ -98,7 +98,7 @@ banker transaction list --jsonl
 banker account list --lines
 ```
 
-`--from` and `--to` accept `YYYY-MM-DD` dates or RFC 3339 timestamps. Alternatively, `--last` accepts durations such as `30d` or `1month`. For `banker sync`, omitting a time-frame option requests the longest transaction history available; use `--last` or a bounded `--from`/`--to` range for a narrower sync. `--all` also requests the full available history. Use `banker <command> --help` for the complete command options.
+`--from` and `--to` accept `YYYY-MM-DD` dates or RFC 3339 timestamps. Alternatively, `--last` accepts positive durations such as `30d` or `1month`. Omitting a time-frame option requests the longest transaction history available; use `--last` or a bounded `--from`/`--to` range for a narrower sync. `--all` also requests the full available history. Sync exits nonzero if any selected session or account fails, even when other accounts were stored successfully. Use `banker <command> --help` for the complete command options.
 
 ### Metadata
 

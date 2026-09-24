@@ -3,10 +3,10 @@ use crate::error::AppError;
 use std::path::PathBuf;
 use std::process::Command;
 
-fn systemd_dir() -> PathBuf {
-    dirs::home_dir()
-        .expect("HOME not set")
-        .join(".config/systemd/user")
+fn systemd_dir() -> Result<PathBuf, AppError> {
+    Ok(dirs::home_dir()
+        .ok_or_else(|| AppError::Other("home directory not found".into()))?
+        .join(".config/systemd/user"))
 }
 
 fn ensure_systemd_available() -> Result<(), AppError> {
@@ -25,6 +25,16 @@ fn ensure_systemd_available() -> Result<(), AppError> {
     }
 
     Ok(())
+}
+
+fn systemd_quote(value: &str) -> String {
+    format!(
+        "\"{}\"",
+        value
+            .replace('%', "%%")
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+    )
 }
 
 fn service_file() -> String {
@@ -47,7 +57,10 @@ async fn install() -> Result<(), AppError> {
     ensure_systemd_available()?;
 
     let exe = std::env::current_exe()?;
-    let dir = systemd_dir();
+    let exe = exe
+        .to_str()
+        .ok_or_else(|| AppError::Other("executable path is not UTF-8".into()))?;
+    let dir = systemd_dir()?;
     std::fs::create_dir_all(&dir)?;
 
     let service_path = dir.join(service_file());
@@ -64,7 +77,7 @@ ExecStart={} sync
 [Install]
 WantedBy=default.target
 ",
-        exe.display()
+        systemd_quote(exe)
     );
     std::fs::write(&service_path, service.as_bytes())?;
     eprintln!("Created {}", service_path.display());
@@ -100,7 +113,7 @@ async fn uninstall() -> Result<(), AppError> {
         .stderr(std::process::Stdio::null())
         .status();
 
-    let dir = systemd_dir();
+    let dir = systemd_dir()?;
     let service_path = dir.join(service_file());
     let timer_path = dir.join(timer_file());
 

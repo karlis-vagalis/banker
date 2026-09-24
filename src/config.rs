@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-fn default_api_base_url() -> String {
-    "https://api.enablebanking.com".to_string()
+fn default_api_base_url() -> url::Url {
+    url::Url::parse("https://api.enablebanking.com").expect("constant API URL is valid")
 }
 
 /// User-editable configuration, loaded from a TOML file.
@@ -34,11 +34,11 @@ pub struct Config {
     pub bank: HashMap<String, BankConfig>,
     /// EnableBanking API base URL. Defaults to the production API.
     #[serde(default = "default_api_base_url")]
-    pub api_base_url: String,
+    pub api_base_url: url::Url,
     /// Redirect URL to use when starting an authorization. If omitted, the first
     /// redirect URL registered on your application (via `GET /application`) is used.
     #[serde(default)]
-    pub redirect_url: Option<String>,
+    pub redirect_url: Option<url::Url>,
 }
 
 /// A named bank entry that maps a short key to the actual ASPSP name and country.

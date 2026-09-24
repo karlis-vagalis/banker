@@ -1,6 +1,5 @@
 use crate::api::EnableBankingClient;
 use crate::api::models::EnableBankingAccountId;
-use crate::api::openapi::types::Transaction;
 use crate::cli::MetadataAction;
 use crate::config::{ApplicationConfig, Config};
 use crate::db::row::TransactionRow;
@@ -47,12 +46,7 @@ pub async fn list_local(
         return Ok(());
     }
 
-    let txs: Vec<&Transaction> = rows.iter().map(|r| &r.content.0).collect();
-    let ids: Vec<String> = rows.iter().map(|r| r.id.to_string()).collect();
-    let account_ids: Vec<String> = rows.iter().map(|r| r.account_id.to_string()).collect();
-    let updated_ats: Vec<chrono::DateTime<chrono::Utc>> =
-        rows.iter().map(|r| r.updated_at).collect();
-    print_db_transactions(&txs, &ids, &account_ids, &updated_ats, format)?;
+    print_db_transactions(&rows, format)?;
     Ok(())
 }
 

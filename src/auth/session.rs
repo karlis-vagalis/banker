@@ -5,6 +5,8 @@ use crate::{
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -72,18 +74,26 @@ impl Sessions {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let text = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, text)?;
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(path)?.permissions();
-            perms.set_mode(0o600);
-            std::fs::set_permissions(path, perms)?;
+        let text = serde_json::to_vec_pretty(self)?;
+        let temporary = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
+        let result = (|| -> Result<(), AppError> {
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            let mut file = options.open(&temporary)?;
+            file.write_all(&text)?;
+            file.sync_all()?;
+            std::fs::rename(&temporary, path)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
         }
-
-        Ok(())
+        result
     }
 
     pub fn add(&mut self, session: Session) {
@@ -94,19 +104,22 @@ impl Sessions {
         self.0.retain(|s| s.session_id != *session_id);
     }
 
-    /// Remove sessions that are locally expired or not `Authorized` on the remote,
-    /// optionally revoking them first.
-    pub async fn prune_inactive(&mut self, client: &EnableBankingClient) -> Result<(), AppError> {
+    /// Remove confirmed inactive sessions for this application, revoking them best-effort.
+    /// Keep sessions whose remote status could not be checked.
+    pub async fn prune_inactive(&mut self, app_id: &str, client: &EnableBankingClient) -> bool {
         let mut stale = Vec::new();
 
-        for session in &self.0 {
+        for session in self.0.iter().filter(|session| session.app_id == app_id) {
             if session.is_expired() {
                 stale.push(session.session_id.clone());
                 continue;
             }
             match client.get_session(&session.session_id).await {
                 Ok(resp) if resp.status == openapi::types::SessionStatus::Authorized => {}
-                _ => stale.push(session.session_id.clone()),
+                Ok(_) => stale.push(session.session_id.clone()),
+                Err(error) => {
+                    tracing::warn!("could not check session {}: {error}", session.session_id)
+                }
             }
         }
 
@@ -118,7 +131,7 @@ impl Sessions {
         for id in &stale {
             self.remove(id);
         }
-        Ok(())
+        !stale.is_empty()
     }
 
     #[allow(dead_code)]

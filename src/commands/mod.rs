@@ -26,12 +26,14 @@ pub async fn dispatch(cli: Cli) -> anyhow::Result<()> {
 async fn with_database<T, E, F, Fut>(config_path: &Path, operation: F) -> anyhow::Result<T>
 where
     E: Into<anyhow::Error>,
-    F: FnOnce(crate::db::Database) -> Fut,
+    F: FnOnce(Config, crate::db::Database) -> Fut,
     Fut: Future<Output = Result<T, E>>,
 {
     let config = Config::load(config_path)?;
     let database = crate::db::Database::open(&config.db_path()).await?;
-    let result = operation(database.clone()).await.map_err(Into::into);
+    let result = operation(config, database.clone())
+        .await
+        .map_err(Into::into);
     let checkpoint_result = database.checkpoint().await;
     database.close().await;
 
@@ -51,10 +53,10 @@ where
 async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Result<()> {
     match cli.command {
         Commands::Auth { app, action } => {
-            auth::run(&config_path, app.app.as_deref(), action).await?
+            auth::run(config_path, app.app.as_deref(), action).await?
         }
         Commands::Bank { country, search } => {
-            let config = Config::load(&config_path)?;
+            let config = Config::load(config_path)?;
             let (_name, app_cfg) = config.resolve_app(None)?;
             bank::run(&config, app_cfg, country, search).await?;
         }
@@ -62,9 +64,9 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
             time_frame_args,
             bank,
         } => {
-            let time_frame = time_frame_from_args(time_frame_args);
-            with_database(config_path, |database| async move {
-                sync::run(config_path, time_frame, bank, &database).await
+            let time_frame = time_frame_from_args(time_frame_args).map_err(anyhow::Error::msg)?;
+            with_database(config_path, |config, database| async move {
+                sync::run(&config, time_frame, bank, &database).await
             })
             .await?;
         }
@@ -75,16 +77,17 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 account_id,
                 time_frame_args,
             } => {
-                let config = Config::load(&config_path)?;
+                let config = Config::load(config_path)?;
                 let (_name, app_cfg) = config.resolve_app(app.app.as_deref())?;
-                let time_frame = time_frame_from_args(Some(time_frame_args));
+                let time_frame =
+                    time_frame_from_args(Some(time_frame_args)).map_err(anyhow::Error::msg)?;
                 let id = EnableBankingAccountId::try_from(account_id)?;
                 transaction::fetch(&config, app_cfg, &id, time_frame.as_ref(), output.format())
                     .await?;
             }
             TransactionAction::List { bank, output } => {
-                let bank_filter = local::resolve_filter_bank(&config_path, bank.bank.as_deref())?;
-                with_database(config_path, |database| async move {
+                with_database(config_path, |config, database| async move {
+                    let bank_filter = local::resolve_filter_bank(&config, bank.bank.as_deref())?;
                     transaction::list_local(
                         &database,
                         bank_filter.as_ref().map(|(n, _)| n.as_str()),
@@ -96,7 +99,7 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 .await?;
             }
             TransactionAction::Metadata { action } => {
-                with_database(config_path, |database| async move {
+                with_database(config_path, |_, database| async move {
                     transaction::metadata_local(&database, action).await
                 })
                 .await?;
@@ -108,14 +111,14 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 output,
                 account_id,
             } => {
-                let config = Config::load(&config_path)?;
+                let config = Config::load(config_path)?;
                 let (_name, app_cfg) = config.resolve_app(app.app.as_deref())?;
                 let id = EnableBankingAccountId::try_from(account_id)?;
                 accounts::fetch(&config, app_cfg, &id, output.format()).await?;
             }
             AccountAction::List { bank, output } => {
-                let bank_filter = local::resolve_filter_bank(&config_path, bank.bank.as_deref())?;
-                with_database(config_path, |database| async move {
+                with_database(config_path, |config, database| async move {
+                    let bank_filter = local::resolve_filter_bank(&config, bank.bank.as_deref())?;
                     accounts::list_local(
                         &database,
                         bank_filter.as_ref().map(|(n, _)| n.as_str()),
@@ -127,7 +130,7 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 .await?;
             }
             AccountAction::Metadata { action } => {
-                with_database(config_path, |database| async move {
+                with_database(config_path, |_, database| async move {
                     accounts::metadata_local(&database, action).await
                 })
                 .await?;
@@ -139,15 +142,15 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 output,
                 account_id,
             } => {
-                let config = Config::load(&config_path)?;
+                let config = Config::load(config_path)?;
                 let (_name, app_cfg) = config.resolve_app(app.app.as_deref())?;
 
                 let id = EnableBankingAccountId::try_from(account_id)?;
                 balance::fetch(&config, app_cfg, &id, output.format()).await?;
             }
             BalanceAction::List { bank, output } => {
-                let bank_filter = local::resolve_filter_bank(&config_path, bank.bank.as_deref())?;
-                with_database(config_path, |database| async move {
+                with_database(config_path, |config, database| async move {
+                    let bank_filter = local::resolve_filter_bank(&config, bank.bank.as_deref())?;
                     balance::list_local(
                         &database,
                         bank_filter.as_ref().map(|(n, _)| n.as_str()),
@@ -159,8 +162,8 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 .await?;
             }
             BalanceAction::Current { bank, output } => {
-                let bank_filter = local::resolve_filter_bank(&config_path, bank.bank.as_deref())?;
-                with_database(config_path, |database| async move {
+                with_database(config_path, |config, database| async move {
+                    let bank_filter = local::resolve_filter_bank(&config, bank.bank.as_deref())?;
                     balance::current_local(
                         &database,
                         bank_filter.as_ref().map(|(n, _)| n.as_str()),
@@ -172,7 +175,7 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 .await?;
             }
             BalanceAction::Metadata { action } => {
-                with_database(config_path, |database| async move {
+                with_database(config_path, |_, database| async move {
                     balance::metadata_local(&database, action).await
                 })
                 .await?;

@@ -24,7 +24,7 @@ pub async fn run(
         } => {
             let (_bank_name, bank_cfg) = config.resolve_bank(target.bank.as_deref())?;
             login(
-                config_path,
+                &config,
                 app_name,
                 bank_cfg.name.clone(),
                 bank_cfg.country.clone(),
@@ -35,38 +35,32 @@ pub async fn run(
         }
         AuthAction::Logout { target } => {
             let (_bank_name, bank_cfg) = config.resolve_bank(target.bank.as_deref())?;
-            logout(config_path, app_name, &bank_cfg.name, &bank_cfg.country).await
+            logout(&config, app_name, &bank_cfg.name, &bank_cfg.country).await
         }
-        AuthAction::Status => status(config_path).await,
+        AuthAction::Status => status(&config).await,
     }
 }
 
 async fn login(
-    config_path: &Path,
+    config: &Config,
     app_name: Option<&str>,
     bank: String,
     country: String,
     valid_days: i64,
     no_browser: bool,
 ) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
     let (_app_name, app_cfg) = config.resolve_app(app_name)?;
-    let client = EnableBankingClient::new(&config, app_cfg).await?;
+    let client = EnableBankingClient::new(config, app_cfg).await?;
 
     // Prune stale/expired sessions before starting new auth
-    if let Ok(mut sessions) = Sessions::load(&session_path()) {
-        if !sessions.0.is_empty() {
-            if let Err(e) = sessions.prune_inactive(&client).await {
-                tracing::warn!("failed to prune stale sessions: {e}");
-            }
-            if !sessions.0.is_empty() {
-                let _ = sessions.save(&session_path());
-            }
-        }
+    let path = session_path();
+    let mut sessions = Sessions::load(&path)?;
+    if sessions.prune_inactive(&app_cfg.id, &client).await {
+        sessions.save(&path)?;
     }
 
     let redirect_url = match &config.redirect_url {
-        Some(u) => u.clone(),
+        Some(u) => u.to_string(),
         None => {
             let application = client.get_application().await?;
 
@@ -123,8 +117,7 @@ async fn login(
 
     // Remove the old local session entry for this bank+app before adding the new one.
     // EnableBanking already revokes the previous session server-side when a new one is created.
-    let path = session_path();
-    let mut sessions = Sessions::load(&path)?;
+    sessions = Sessions::load(&path)?;
     if let Some(old) = sessions.find_by_bank_and_app(&bank, &country, &app_cfg.id) {
         let old_id = old.session_id.clone();
         sessions.remove(&old_id);
@@ -132,21 +125,24 @@ async fn login(
 
     let id = EnableBankingSessionId::try_from(session_response.session_id.clone())?;
 
+    let accounts = session_response
+        .accounts
+        .iter()
+        .map(|account| {
+            let uid = account.uid.ok_or_else(|| {
+                AppError::Other("authorization returned an account without a UID".into())
+            })?;
+            EnableBankingAccountId::try_from(uid.to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
     let session = Session {
         session_id: id,
         app_id: app_cfg.id.clone(),
         aspsp_name: bank,
         aspsp_country: country,
-        accounts: session_response
-            .accounts
-            .iter()
-            .map(|e| {
-                e.uid
-                    .map(|id| EnableBankingAccountId::try_from(id.to_string()).unwrap())
-                    .unwrap()
-            })
-            .collect(),
-        valid_until: valid_until,
+        accounts,
+        valid_until,
         created_at: Utc::now(),
     };
 
@@ -159,12 +155,11 @@ async fn login(
 }
 
 async fn logout(
-    config_path: &Path,
+    config: &Config,
     app_name: Option<&str>,
     bank: &str,
     country: &str,
 ) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
     let (_name, app_cfg) = config.resolve_app(app_name)?;
     let path = session_path();
     let mut sessions = Sessions::load(&path)?;
@@ -179,7 +174,7 @@ async fn logout(
         })?
         .clone();
 
-    let client = EnableBankingClient::new(&config, app_cfg).await?;
+    let client = EnableBankingClient::new(config, app_cfg).await?;
     if let Err(e) = client.delete_session(&session.session_id).await {
         tracing::warn!("failed to revoke session remotely: {e}");
     }
@@ -190,8 +185,7 @@ async fn logout(
     Ok(())
 }
 
-async fn status(config_path: &Path) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
+async fn status(config: &Config) -> Result<(), AppError> {
     let path = session_path();
     let sessions = Sessions::load(&path)?;
 
@@ -213,7 +207,7 @@ async fn status(config_path: &Path) -> Result<(), AppError> {
 
         let app = config.find_app_by_id(&session.app_id);
         let client = match app {
-            Some((_name, app_cfg)) => EnableBankingClient::new(&config, app_cfg).await,
+            Some((_name, app_cfg)) => EnableBankingClient::new(config, app_cfg).await,
             None => {
                 println!(
                     "  (application not found in config for app_id {})",

@@ -1,6 +1,10 @@
-use crate::models::{AccountId, BalanceId, Resource, ResourceType, TimeFrame, TransactionId};
+mod metadata;
+mod time_frame;
+pub use metadata::{MetadataAction, SchemaAction};
+pub use time_frame::{TimeFrameArgs, time_frame_from_args};
+
+use crate::models::{AccountId, BalanceId, Resource, ResourceType, TransactionId};
 use crate::output::OutputFormat;
-use chrono::{DateTime, Duration, NaiveDate, TimeDelta, Utc};
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -15,10 +19,10 @@ pub struct BankArg {
 #[derive(Args, Clone)]
 pub struct OutputArg {
     /// Output as line-delimited JSON (streaming) instead of a table
-    #[arg(long)]
+    #[arg(long, conflicts_with = "lines")]
     pub jsonl: bool,
     /// Output as pipe-separated plain text (one record per line, no headers, no truncation — grep-friendly)
-    #[arg(long)]
+    #[arg(long, conflicts_with = "jsonl")]
     pub lines: bool,
 }
 
@@ -40,48 +44,6 @@ pub struct AppArg {
     /// EnableBanking application name (required only when multiple applications are configured)
     #[arg(long)]
     pub app: Option<String>,
-}
-
-fn parse_clap_duration(s: &str) -> Result<chrono::TimeDelta, String> {
-    duration_str::parse_chrono(s)
-}
-
-fn parse_utc_date(s: &str) -> Result<DateTime<Utc>, String> {
-    if let Ok(datetime) = s.parse::<DateTime<Utc>>() {
-        return Ok(datetime);
-    }
-
-    if let Ok(date) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
-            return Ok(naive_dt.and_utc());
-        }
-    }
-
-    Err(format!(
-        "Invalid timestamp '{}'. Expected RFC 3339 / ISO timestamp (e.g., 2026-07-10T14:30:00Z) or a plain date (e.g., 2026-07-10).",
-        s
-    ))
-}
-
-/// Group of arguments used to specify time frame, from-to OR last x
-#[derive(Args, Clone)]
-#[group(required = false)]
-#[command(next_help_heading = "Time frame")]
-pub struct TimeFrameArgs {
-    /// Fetch the entire history
-    #[arg(long, conflicts_with_all = ["from", "to", "last"])]
-    pub all: bool,
-
-    /// From date in the format "YYYY-MM-DD" (e.g., 2026-07-10) or RFC 3339 / ISO 8601 (e.g., 2026-07-10T14:30:00Z)
-    #[arg(long, requires = "to", value_parser = parse_utc_date)]
-    pub from: Option<DateTime<Utc>>,
-    /// To date in the format "YYYY-MM-DD" (e.g., 2026-07-10) or RFC 3339 / ISO 8601 (e.g., 2026-07-10T14:30:00Z)
-    #[arg(long, requires = "from", value_parser = parse_utc_date)]
-    pub to: Option<DateTime<Utc>>,
-
-    /// Specify a relative duration from now (e.g., "1d", "1month")
-    #[arg(long, conflicts_with_all = ["from", "to", "all"], value_parser = parse_clap_duration)]
-    pub last: Option<Duration>,
 }
 
 #[derive(Parser)]
@@ -112,7 +74,7 @@ pub enum Commands {
     Bank {
         /// Filter by ISO country code, e.g. DE
         #[arg(long)]
-        country: Option<String>,
+        country: Option<crate::api::openapi::types::Country>,
         /// Filter by (partial, case-insensitive) bank name
         #[arg(long)]
         search: Option<String>,
@@ -269,65 +231,6 @@ pub enum TransactionAction {
     },
 }
 
-use std::error::Error as StdError;
-use std::str::FromStr;
-
-#[derive(Subcommand)]
-pub enum MetadataAction<T>
-where
-    T: FromStr + Clone + Send + Sync + 'static,
-    <T as FromStr>::Err: Into<Box<dyn StdError + Send + Sync>>,
-{
-    /// Manage the global JSON Schema for metadata
-    Schema {
-        #[command(subcommand)]
-        action: SchemaAction,
-    },
-    /// Attach metadata
-    Set {
-        /// Internal ID from the database
-        id: T,
-        /// Raw JSON metadata string, a file path, or "-" for stdin. Omit to pipe from stdin.
-        metadata: Option<String>,
-        /// Skip the confirmation prompt when overwriting existing metadata
-        #[arg(short, long)]
-        yes: bool,
-    },
-    /// Retrieve metadata
-    Get {
-        /// Internal ID from the database
-        id: T,
-    },
-    /// Delete metadata
-    Delete {
-        /// Internal ID from the database
-        id: T,
-        /// Skip the confirmation prompt
-        #[arg(short, long)]
-        yes: bool,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum SchemaAction {
-    /// Save a JSON Schema to the database
-    Set {
-        /// JSON Schema string, a file path, or "-" for stdin. Omit to pipe from stdin.
-        schema: Option<String>,
-        /// Skip the confirmation prompt when overwriting an existing schema
-        #[arg(short, long)]
-        yes: bool,
-    },
-    /// Print the active JSON Schema
-    Get,
-    /// Delete the stored JSON Schema
-    Delete {
-        /// Skip the confirmation prompt
-        #[arg(short, long)]
-        yes: bool,
-    },
-}
-
 #[derive(Subcommand)]
 pub enum SelfFormat {
     /// Display the full command tree with tree-drawing characters
@@ -348,27 +251,4 @@ pub enum SystemdAction {
     Install,
     /// Remove the systemd service and timer
     Uninstall,
-}
-
-pub fn time_frame_from_args(time_frame_args: Option<TimeFrameArgs>) -> Option<TimeFrame> {
-    let now = Utc::now();
-    match &time_frame_args {
-        Some(args) if args.all => None,
-        Some(args) => match args.last {
-            Some(last) => Some(TimeFrame {
-                from: now - last,
-                to: now,
-            }),
-            None => {
-                let (Some(from), Some(to)) = (args.from, args.to) else {
-                    panic!()
-                };
-                Some(TimeFrame { from, to })
-            }
-        },
-        None => Some(TimeFrame {
-            from: now - TimeDelta::days(7),
-            to: now,
-        }),
-    }
 }

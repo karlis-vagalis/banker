@@ -25,26 +25,27 @@ pub static SQIDS: LazyLock<Sqids> = LazyLock::new(|| {
 macro_rules! define_id_type {
     ($struct_name:ident, $prefix:expr) => {
         #[derive(Debug, Clone, PartialEq, Eq)]
-        pub struct $struct_name(pub String);
+        pub struct $struct_name(i64);
 
         impl TryFrom<String> for $struct_name {
             type Error = &'static str;
             fn try_from(value: String) -> Result<Self, Self::Error> {
-                let parts: Vec<&str> = value.split('_').collect();
-                if parts.len() != 2 {
-                    return Err("Invalid format");
-                }
-                if parts[0] != $prefix {
+                let (prefix, payload) = value.split_once('_').ok_or("Invalid ID format")?;
+                if prefix != $prefix {
                     return Err("Invalid ID prefix");
                 }
-
-                // Ensure the sqid part actually decodes to a valid ID
-                let numbers = SQIDS.decode(parts[1]);
-                if numbers.is_empty() {
-                    return Err("Malformed or invalid Sqid payload");
+                let numbers = SQIDS.decode(payload);
+                let [number] = numbers.as_slice() else {
+                    return Err("ID must encode exactly one number");
+                };
+                let raw = i64::try_from(*number).map_err(|_| "ID exceeds SQLite integer range")?;
+                if raw <= 0 {
+                    return Err("ID must be positive");
                 }
-
-                Ok(Self(value))
+                if SQIDS.encode(&[*number]).as_deref() != Ok(payload) {
+                    return Err("Non-canonical ID encoding");
+                }
+                Ok(Self(raw))
             }
         }
 
@@ -57,39 +58,29 @@ macro_rules! define_id_type {
             }
         }
 
-        impl From<u64> for $struct_name {
-            fn from(value: u64) -> Self {
-                let sqid_str = SQIDS.encode(&[value]).expect("Failed to encode ID");
-                Self(format!("{}_{}", $prefix, sqid_str))
-            }
-        }
-
-        impl From<i64> for $struct_name {
-            fn from(value: i64) -> Self {
-                let sqid_str = SQIDS.encode(&[value as u64]).expect("Failed to encode ID");
-                Self(format!("{}_{}", $prefix, sqid_str))
-            }
-        }
-
-        // Reusable extraction path (e.g., used by SQLx Encode)
-        impl TryFrom<&$struct_name> for i64 {
+        impl TryFrom<i64> for $struct_name {
             type Error = &'static str;
 
-            fn try_from(id: &$struct_name) -> Result<Self, Self::Error> {
-                let parts: Vec<&str> = id.0.split('_').collect();
-                if parts.len() != 2 || parts[0] != $prefix {
-                    return Err("Invalid or mismatched ID prefix");
+            fn try_from(value: i64) -> Result<Self, Self::Error> {
+                if value <= 0 {
+                    return Err("ID must be positive");
                 }
+                Ok(Self(value))
+            }
+        }
 
-                let decoded = SQIDS.decode(parts[1]);
-                let raw_id = decoded.first().copied().ok_or("Empty Sqid payload")?;
-                Ok(raw_id as i64)
+        impl $struct_name {
+            pub fn raw(&self) -> i64 {
+                self.0
             }
         }
 
         impl std::fmt::Display for $struct_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                std::fmt::Display::fmt(&self.0, f)
+                let encoded = SQIDS
+                    .encode(&[self.0 as u64])
+                    .map_err(|_| std::fmt::Error)?;
+                write!(f, "{}_{}", $prefix, encoded)
             }
         }
 
@@ -104,8 +95,7 @@ macro_rules! define_id_type {
                 &self,
                 args: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer,
             ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-                let raw_id = i64::try_from(self)?;
-                <i64 as sqlx::Encode<'q, sqlx::Sqlite>>::encode_by_ref(&raw_id, args)
+                <i64 as sqlx::Encode<'q, sqlx::Sqlite>>::encode_by_ref(&self.0, args)
             }
         }
 
@@ -113,11 +103,8 @@ macro_rules! define_id_type {
             fn decode(
                 value: sqlx::sqlite::SqliteValueRef<'r>,
             ) -> Result<Self, sqlx::error::BoxDynError> {
-                // Read the raw i64 from SQLite
                 let raw_id = <i64 as sqlx::Decode<'r, sqlx::Sqlite>>::decode(value)?;
-
-                // Fixed: Use From<i64> directly here since it handles formatting safely
-                Ok($struct_name::from(raw_id))
+                Ok($struct_name::try_from(raw_id)?)
             }
         }
     };
@@ -190,7 +177,7 @@ impl From<TransactionId> for Resource {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ContentHash(pub u64);
 
 impl ContentHash {

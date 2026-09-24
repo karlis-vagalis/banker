@@ -11,12 +11,11 @@ use std::str::FromStr;
 /// Given an optional `--bank <KEY>`, resolve it to the `(name, country)` pair
 /// for use as SQL filter parameters. Returns `None` when no key was given.
 pub fn resolve_filter_bank(
-    config_path: &Path,
+    config: &Config,
     bank_arg: Option<&str>,
 ) -> Result<Option<(String, String)>, AppError> {
     match bank_arg {
         Some(key) => {
-            let config = Config::load(config_path)?;
             let (_name, bank_cfg) = config.resolve_bank(Some(key))?;
             Ok(Some((bank_cfg.name.clone(), bank_cfg.country.clone())))
         }

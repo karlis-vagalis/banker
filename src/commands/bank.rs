@@ -5,11 +5,11 @@ use crate::error::AppError;
 pub async fn run(
     config: &Config,
     app_cfg: &ApplicationConfig,
-    country: Option<String>,
+    country: Option<crate::api::openapi::types::Country>,
     search: Option<String>,
 ) -> Result<(), AppError> {
     let client = EnableBankingClient::new(config, app_cfg).await?;
-    let aspsps = client.list_aspsps(country.as_deref()).await?;
+    let aspsps = client.list_aspsps(country.as_ref()).await?;
 
     let needle = search.map(|s| s.to_lowercase());
     let filtered: Vec<_> = aspsps

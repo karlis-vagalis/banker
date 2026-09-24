@@ -1,19 +1,11 @@
 use crate::api::EnableBankingClient;
-use crate::api::models::EnableBankingAccountId;
 use crate::auth::session::Sessions;
 use crate::config::{Config, session_path};
-use crate::db::{self};
 use crate::error::AppError;
-use crate::models::{ContentHash, TimeFrame, TransactionId};
+use crate::models::TimeFrame;
+mod account;
+use account::sync_account;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::path::Path;
-
-#[allow(dead_code)]
-struct EntitySyncReport {
-    new: usize,
-    changed: usize,
-    unchanged: usize,
-}
 
 #[derive(Default)]
 struct AccountSyncReport {
@@ -32,19 +24,12 @@ struct AccountSyncReport {
     tx_unchanged: usize,
 }
 
-impl AccountSyncReport {
-    fn new() -> Self {
-        Self::default()
-    }
-}
-
 pub async fn run(
-    config_path: &Path,
+    config: &Config,
     time_frame: Option<TimeFrame>,
     bank_filter: Option<Vec<String>>,
     database: &crate::db::Database,
 ) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
     match &time_frame {
         Some(tf) => tracing::info!("syncing transactions from {} to {}", tf.from, tf.to),
         None => tracing::info!("syncing all available transactions"),
@@ -67,8 +52,9 @@ pub async fn run(
     let sessions = Sessions::load(&session_path())?;
 
     if sessions.0.is_empty() {
-        tracing::warn!("no sessions found — run `banker auth login` first");
-        return Ok(());
+        return Err(AppError::Other(
+            "no sessions found — run `banker auth login` first".into(),
+        ));
     }
 
     let pb = ProgressBar::new_spinner();
@@ -82,9 +68,18 @@ pub async fn run(
     let mut account_lines: Vec<String> = Vec::new();
     let mut balance_lines: Vec<String> = Vec::new();
     let mut tx_lines: Vec<String> = Vec::new();
-    let mut total = AccountSyncReport::new();
+    let mut total = AccountSyncReport::default();
+    let mut matched_sessions = 0;
 
     for session in &sessions.0 {
+        if let Some(ref banks) = resolved_banks
+            && !banks
+                .iter()
+                .any(|(n, c)| n == &session.aspsp_name && c == &session.aspsp_country)
+        {
+            continue;
+        }
+        matched_sessions += 1;
         if session.is_expired() {
             tracing::warn!(
                 "session for {} ({}) has expired, skipping",
@@ -93,15 +88,6 @@ pub async fn run(
             );
             total.errors += 1;
             continue;
-        }
-
-        if let Some(ref banks) = resolved_banks {
-            if !banks
-                .iter()
-                .any(|(n, c)| n == &session.aspsp_name && c == &session.aspsp_country)
-            {
-                continue;
-            }
         }
 
         let Some((_app_name, app_cfg)) = config.find_app_by_id(&session.app_id) else {
@@ -115,7 +101,7 @@ pub async fn run(
             continue;
         };
 
-        let client = match EnableBankingClient::new(&config, app_cfg).await {
+        let client = match EnableBankingClient::new(config, app_cfg).await {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!(
@@ -148,7 +134,7 @@ pub async fn run(
             let outcome = match sync_account(
                 &client,
                 database.pool(),
-                &account_id,
+                account_id,
                 &session.aspsp_name,
                 &session.aspsp_country,
                 time_frame.as_ref(),
@@ -229,6 +215,11 @@ pub async fn run(
     }
 
     pb.finish_and_clear();
+    if matched_sessions == 0 {
+        return Err(AppError::Other(
+            "no sessions match the selected bank(s) — run `banker auth login` first".into(),
+        ));
+    }
 
     println!("\n[1/3] Accounts ──────────────────────────");
     for line in &account_lines {
@@ -275,126 +266,11 @@ pub async fn run(
         total.tx_unchanged,
     );
 
+    if total.errors > 0 {
+        return Err(AppError::Other(format!(
+            "sync completed with {} error(s)",
+            total.errors
+        )));
+    }
     Ok(())
-}
-
-async fn sync_account(
-    client: &EnableBankingClient,
-    pool: &sqlx::Pool<sqlx::Sqlite>,
-    account_id: &EnableBankingAccountId,
-    aspsp_name: &str,
-    aspsp_country: &str,
-    time_frame: Option<&TimeFrame>,
-) -> Result<AccountSyncReport, AppError> {
-    let account = client.get_account_details(account_id).await?;
-    let account_json = serde_json::to_value(&account)?;
-    let new_hash = ContentHash::new(account_json.to_string().as_bytes());
-
-    let account_name = account.name.as_deref().unwrap_or("Account").to_string();
-    let account_iban = account
-        .account_id
-        .as_ref()
-        .and_then(|id| id.iban.as_deref())
-        .unwrap_or("")
-        .to_string();
-
-    let account_identification_hash = &account.identification_hash;
-
-    let (account_fk, account_added, account_updated) =
-        match db::account_exists(pool, account_identification_hash).await? {
-            Some((existing_id, stored_hash)) => {
-                if stored_hash != new_hash {
-                    db::update_account(pool, existing_id.clone(), &account_json, new_hash).await?;
-                    (existing_id, false, true)
-                } else {
-                    (existing_id, false, false)
-                }
-            }
-            None => {
-                let new_id = db::insert_account(
-                    pool,
-                    account_identification_hash,
-                    aspsp_name,
-                    aspsp_country,
-                    &account_json,
-                    new_hash,
-                )
-                .await?;
-                (new_id, true, false)
-            }
-        };
-
-    let mut report = AccountSyncReport::new();
-    report.account_name = account_name;
-    report.account_iban = account_iban;
-    report.account_added = account_added;
-    report.account_updated = account_updated;
-
-    let mut tx = pool.begin().await?;
-
-    let hal_balances = client.get_account_balances(account_id).await?;
-    for b in &hal_balances.balances {
-        db::insert_balance(
-            &mut *tx,
-            account_fk.clone(),
-            &b.balance_type.to_string(),
-            &serde_json::to_value(b)?,
-        )
-        .await?;
-        report.balances += 1;
-    }
-
-    let txs = client
-        .get_account_transactions(account_id, time_frame)
-        .await?;
-
-    let entry_refs: Vec<&str> = txs
-        .iter()
-        .filter_map(|t| t.entry_reference.as_deref())
-        .collect();
-    let existing_map: std::collections::HashMap<String, (TransactionId, ContentHash)> =
-        if entry_refs.is_empty() {
-            std::collections::HashMap::new()
-        } else {
-            db::transactions_existing_hashes(&mut *tx, account_fk.clone(), &entry_refs)
-                .await?
-                .into_iter()
-                .map(|(ref_, id, h)| (ref_, (id, h)))
-                .collect()
-        };
-
-    let mut to_insert: Vec<(Option<String>, String, ContentHash)> = Vec::new();
-    for t in &txs {
-        let tx_json = serde_json::to_value(t)?;
-        let tx_hash = ContentHash::new(tx_json.to_string().as_bytes());
-        let entry_ref = t.entry_reference.clone();
-
-        match entry_ref.as_deref().and_then(|r| existing_map.get(r)) {
-            Some(&(ref existing_tx_id, stored_hash)) => {
-                if stored_hash != tx_hash {
-                    db::update_transaction(&mut *tx, existing_tx_id.clone(), &tx_json, tx_hash)
-                        .await?;
-                    report.tx_updated += 1;
-                } else {
-                    report.tx_unchanged += 1;
-                }
-            }
-            None => {
-                to_insert.push((entry_ref, tx_json.to_string(), tx_hash));
-            }
-        }
-    }
-
-    if !to_insert.is_empty() {
-        let batch: Vec<(Option<&str>, &str, ContentHash)> = to_insert
-            .iter()
-            .map(|(ref_, content, h)| (ref_.as_deref(), content.as_str(), *h))
-            .collect();
-        db::insert_transactions_batch(&mut *tx, account_fk.clone(), &batch).await?;
-        report.tx_new = batch.len();
-    }
-
-    tx.commit().await?;
-
-    Ok(report)
 }
