@@ -1,0 +1,8 @@
+- name: Install just
+  uses: taiki-e/install-action@just
+- name: Set package version from release tag
+  if: startsWith(github.ref, 'refs/tags/')
+  env:
+    RELEASE_TAG: ${{ github.ref_name }}
+  run: just --shell bash --shell-arg=-cu set-version "${RELEASE_TAG#v}"
+  shell: bash

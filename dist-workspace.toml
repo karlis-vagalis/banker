@@ -1,0 +1,15 @@
+[workspace]
+members = ["cargo:."]
+
+[dist]
+cargo-dist-version = "0.28.7"
+ci = "github"
+publish-jobs = ["./publish"]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+source-tarball = false
+installers = ["shell", "powershell"]
+hosting = "github"
+# Build-tag setup injects the SemVer version so the binary embeds the real release version.
+github-build-setup = "../dist-build-setup.yml"
+# Keep the tiny force-tag customization in the generated release workflow.
+allow-dirty = ["ci"]

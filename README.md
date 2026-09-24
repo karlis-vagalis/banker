@@ -125,6 +125,12 @@ Use `banker account metadata --help` (or the balance/transaction equivalents) fo
 - Syncing sends requests to Enable Banking and retrieves financial data from the providers you authorize. Treat the database, session file, configuration, and backups as sensitive. Protect them with appropriate filesystem permissions and disk encryption.
 - Banker is an early-stage project. Review the code and your provider's terms before connecting a real account; use it at your own risk.
 
+## Releasing
+
+The source manifest stays at version `0.0.0`. Install [`doxxer`](https://github.com/karlis-vagalis/doxxer), then run `just release` from a clean working tree to create and push the next `vX.Y.Z` tag on the current commit. The cargo-dist-generated GitHub workflow injects that tag's version while building the binaries; its crates.io publish job injects the same version before publishing.
+
+Before the first release, add a `CARGO_REGISTRY_TOKEN` secret to the GitHub repository. The release workflow creates a GitHub Release with Linux and Windows assets, then publishes the crate to crates.io.
+
 ## Development
 
 ```sh
@@ -137,4 +143,4 @@ The Enable Banking client is generated at build time from `enablebanking-api.yam
 
 ## License
 
-No license has been specified yet. Until a license is added, all rights are reserved; do not assume the code is available for reuse or redistribution.
+Licensed under the GNU Affero General Public License, version 3 or (at your option) any later version. See [LICENSE](LICENSE) for the full license text.
