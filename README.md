@@ -8,6 +8,10 @@ A command-line client for [Enable Banking](https://enablebanking.com/) that link
 
 > **Status:** Early-stage personal project. The CLI and configuration format may change. It is not affiliated with or endorsed by Enable Banking or any bank.
 
+## Support
+
+Enable Banking and provider banks do not support Banker. For issues using this CLI, please do not contact them; report the problem in the [Banker issue tracker](https://github.com/karlis-vagalis/banker/issues) with the command and a redacted error message. Never include private keys, session details, IBANs, or transaction data in an issue.
+
 ## Features
 
 - Authorize and manage bank sessions through Enable Banking.
