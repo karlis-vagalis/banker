@@ -9,7 +9,7 @@ use std::path::Path;
 
 /// Opens (creating if needed) the SQLite database, runs pending migrations,
 /// applies performance PRAGMAs, and returns a connection pool.
-pub async fn init_pool(path: &Path) -> Result<SqlitePool, AppError> {
+async fn init_pool(path: &Path) -> Result<SqlitePool, AppError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -30,6 +30,87 @@ pub async fn init_pool(path: &Path) -> Result<SqlitePool, AppError> {
     .await?;
 
     Ok(pool)
+}
+
+/// Owns the connection pool and its orderly shutdown lifecycle.
+#[derive(Clone)]
+pub struct Database {
+    pool: SqlitePool,
+}
+
+impl Database {
+    pub async fn open(path: &Path) -> Result<Self, AppError> {
+        Ok(Self {
+            pool: init_pool(path).await?,
+        })
+    }
+
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
+    pub async fn checkpoint(&self) -> Result<(), AppError> {
+        checkpoint_pool(&self.pool).await
+    }
+
+    pub async fn close(self) {
+        self.pool.close().await;
+    }
+}
+
+/// Checkpoint WAL changes into the main database file.
+async fn checkpoint_pool(pool: &SqlitePool) -> Result<(), AppError> {
+    let (busy, log_frames, checkpointed_frames): (i32, i32, i32) =
+        sqlx::query_as("PRAGMA wal_checkpoint(PASSIVE)")
+            .fetch_one(pool)
+            .await?;
+
+    if log_frames >= 0 && checkpointed_frames < log_frames {
+        return Err(AppError::Other(format!(
+            "SQLite WAL checkpoint incomplete (busy: {busy}, frames: {checkpointed_frames}/{log_frames})"
+        )));
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn checkpoint_merges_wal_frames() {
+        let path = std::env::temp_dir().join(format!(
+            "banker-checkpoint-test-{}-{}.db",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let database = Database::open(&path).await.unwrap();
+
+        sqlx::query(
+            "INSERT INTO metadata_schemas (target_type, json_schema, updated_at) VALUES (?, ?, ?)",
+        )
+        .bind("accounts")
+        .bind("{}")
+        .bind(chrono::Utc::now())
+        .execute(database.pool())
+        .await
+        .unwrap();
+
+        database.checkpoint().await.unwrap();
+        let status: (i32, i32, i32) = sqlx::query_as("PRAGMA wal_checkpoint(NOOP)")
+            .fetch_one(database.pool())
+            .await
+            .unwrap();
+        assert_eq!(status.0, 0);
+        assert_eq!(status.1, status.2);
+
+        database.close().await;
+        for suffix in ["", "-wal", "-shm"] {
+            let file = Path::new(&format!("{}{suffix}", path.display())).to_path_buf();
+            let _ = std::fs::remove_file(file);
+        }
+    }
 }
 
 /// Check if an account exists by identification_hash.

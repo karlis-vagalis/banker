@@ -3,11 +3,10 @@ use crate::api::models::EnableBankingAccountId;
 use crate::api::openapi::types::Transaction;
 use crate::cli::MetadataAction;
 use crate::config::{ApplicationConfig, Config};
-use crate::db::{self, row::TransactionRow};
+use crate::db::row::TransactionRow;
 use crate::error::AppError;
 use crate::models::{ResourceType, TimeFrame, TransactionId};
-use crate::output::{print_api_transactions, print_db_transactions, OutputFormat};
-use std::path::Path;
+use crate::output::{OutputFormat, print_api_transactions, print_db_transactions};
 
 pub async fn fetch(
     config: &Config,
@@ -26,14 +25,11 @@ pub async fn fetch(
 }
 
 pub async fn list_local(
-    config_path: &Path,
+    database: &crate::db::Database,
     bank_name: Option<&str>,
     bank_country: Option<&str>,
     format: OutputFormat,
 ) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
-    let pool = db::init_pool(&config.db_path()).await?;
-
     let rows: Vec<TransactionRow> = sqlx::query_as(
         "SELECT t.id, t.account_id, t.entry_reference, t.content, t.content_hash, t.inserted_at, t.updated_at
          FROM transactions t
@@ -43,7 +39,7 @@ pub async fn list_local(
     )
     .bind(bank_name)
     .bind(bank_country)
-    .fetch_all(&pool)
+    .fetch_all(database.pool())
     .await?;
 
     if rows.is_empty() {
@@ -61,11 +57,10 @@ pub async fn list_local(
 }
 
 pub async fn metadata_local(
-    config_path: &Path,
+    database: &crate::db::Database,
     action: MetadataAction<TransactionId>,
 ) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
-    let pool = db::init_pool(&config.db_path()).await?;
-    crate::commands::local::metadata_dispatch(&pool, &ResourceType::Transaction, action).await?;
+    crate::commands::local::metadata_dispatch(database.pool(), &ResourceType::Transaction, action)
+        .await?;
     Ok(())
 }

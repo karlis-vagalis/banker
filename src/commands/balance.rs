@@ -3,11 +3,10 @@ use crate::api::models::EnableBankingAccountId;
 use crate::api::openapi::types::BalanceResource;
 use crate::cli::MetadataAction;
 use crate::config::{ApplicationConfig, Config};
-use crate::db::{self, row::BalanceRow};
+use crate::db::row::BalanceRow;
 use crate::error::AppError;
 use crate::models::{BalanceId, ResourceType};
-use crate::output::{print_api_balances, print_db_balances, OutputFormat};
-use std::path::Path;
+use crate::output::{OutputFormat, print_api_balances, print_db_balances};
 
 pub async fn fetch(
     config: &Config,
@@ -22,14 +21,11 @@ pub async fn fetch(
 }
 
 pub async fn list_local(
-    config_path: &Path,
+    database: &crate::db::Database,
     bank_name: Option<&str>,
     bank_country: Option<&str>,
     format: OutputFormat,
 ) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
-    let pool = db::init_pool(&config.db_path()).await?;
-
     let rows: Vec<BalanceRow> = sqlx::query_as(
         "SELECT b.id, b.account_id, b.balance_type, b.content, b.inserted_at
          FROM balances b
@@ -39,7 +35,7 @@ pub async fn list_local(
     )
     .bind(bank_name)
     .bind(bank_country)
-    .fetch_all(&pool)
+    .fetch_all(database.pool())
     .await?;
 
     if rows.is_empty() {
@@ -57,14 +53,11 @@ pub async fn list_local(
 }
 
 pub async fn current_local(
-    config_path: &Path,
+    database: &crate::db::Database,
     bank_name: Option<&str>,
     bank_country: Option<&str>,
     format: OutputFormat,
 ) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
-    let pool = db::init_pool(&config.db_path()).await?;
-
     #[derive(sqlx::FromRow)]
     #[allow(dead_code)]
     struct CurrentBalanceRow {
@@ -91,7 +84,7 @@ pub async fn current_local(
     )
     .bind(bank_name)
     .bind(bank_country)
-    .fetch_all(&pool)
+    .fetch_all(database.pool())
     .await?;
 
     if rows.is_empty() {
@@ -109,11 +102,10 @@ pub async fn current_local(
 }
 
 pub async fn metadata_local(
-    config_path: &Path,
+    database: &crate::db::Database,
     action: MetadataAction<BalanceId>,
 ) -> Result<(), AppError> {
-    let config = Config::load(config_path)?;
-    let pool = db::init_pool(&config.db_path()).await?;
-    crate::commands::local::metadata_dispatch(&pool, &ResourceType::Balance, action).await?;
+    crate::commands::local::metadata_dispatch(database.pool(), &ResourceType::Balance, action)
+        .await?;
     Ok(())
 }

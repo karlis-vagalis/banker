@@ -42,9 +42,9 @@ pub async fn run(
     config_path: &Path,
     time_frame: Option<TimeFrame>,
     bank_filter: Option<Vec<String>>,
+    database: &crate::db::Database,
 ) -> Result<(), AppError> {
     let config = Config::load(config_path)?;
-
     match &time_frame {
         Some(tf) => tracing::info!("syncing transactions from {} to {}", tf.from, tf.to),
         None => tracing::info!("syncing all available transactions"),
@@ -64,7 +64,6 @@ pub async fn run(
         None => None,
     };
 
-    let pool = db::init_pool(&config.db_path()).await?;
     let sessions = Sessions::load(&session_path())?;
 
     if sessions.0.is_empty() {
@@ -148,7 +147,7 @@ pub async fn run(
             ));
             let outcome = match sync_account(
                 &client,
-                &pool,
+                database.pool(),
                 &account_id,
                 &session.aspsp_name,
                 &session.aspsp_country,
