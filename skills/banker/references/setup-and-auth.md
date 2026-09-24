@@ -8,8 +8,6 @@ The crate is available on crates.io:
 cargo install banker
 ```
 
-See the [project README](../../../README.md) for additional usage examples.
-
 ## Configuration
 
 Default config is `~/.config/banker/config.toml` on Linux; paths vary by platform. The file requires at least one Enable Banking application:
