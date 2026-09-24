@@ -238,6 +238,7 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+          fetch-depth: 0 # git-cliff needs the previous release tag and its commits
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
@@ -275,6 +276,8 @@ jobs:
         run: |
           # Remove the granular manifests
           rm -f artifacts/*-dist-manifest.json
+      - name: Install git-cliff
+        uses: taiki-e/install-action@git-cliff
       - name: Create GitHub Release
         env:
           PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
@@ -282,10 +285,13 @@ jobs:
           ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
           RELEASE_COMMIT: "${{ github.sha }}"
         run: |
-          # Write and read notes from a file to avoid quoting breaking things
-          echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
-
-          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+          # Generate notes for this tag only; keep them out of the repository.
+          git-cliff --config cliff.toml --current --no-exec --output "$RUNNER_TEMP/notes.md"
+          # Preserve cargo-dist's release details (e.g. installer links).
+          if [ -n "$ANNOUNCEMENT_BODY" ]; then
+            printf '\n\n%s\n' "$ANNOUNCEMENT_BODY" >> "$RUNNER_TEMP/notes.md"
+          fi
+          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.md" artifacts/*
 
   custom-publish:
     needs:

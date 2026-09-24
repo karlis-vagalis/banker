@@ -11,5 +11,6 @@ installers = ["shell", "powershell"]
 hosting = "github"
 # Build-tag setup injects the SemVer version so the binary embeds the real release version.
 github-build-setup = "../dist-build-setup.yml"
-# Keep the tiny force-tag customization in the generated release workflow.
+# Keep the force-tag and git-cliff release-notes customizations in release.yml.
+# cargo-dist will not regenerate/check that workflow while CI is marked dirty.
 allow-dirty = ["ci"]

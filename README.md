@@ -121,7 +121,7 @@ Use `banker account metadata --help` (or the balance/transaction equivalents) fo
 
 ## Releasing
 
-The source manifest stays at version `0.0.0`; release workflows derive the package version from the tag. To release, manually create and push a `vX.Y.Z` tag at the desired commit. GitHub Actions builds the Linux and Windows assets, creates a GitHub Release, and publishes the crate to crates.io using Trusted Publishing (GitHub OIDC) with the `crates-io` environment. No long-lived crates.io API token is required.
+The source manifest stays at version `0.0.0`; release workflows derive the package version from the tag. To release, manually create and push a `vX.Y.Z` tag at the desired commit. GitHub Actions builds the Linux and Windows assets, generates release notes from that tag's conventional commits using the default `cliff.toml` configuration (without checking in a changelog), creates a GitHub Release, and publishes the crate to crates.io using Trusted Publishing (GitHub OIDC) with the `crates-io` environment. No long-lived crates.io API token is required.
 
 ## Development
 
