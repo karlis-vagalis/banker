@@ -39,6 +39,8 @@ To update an existing Cargo installation, run `cargo install banker --force`. If
 
 You'll need an Enable Banking application ID, its matching private key, and a bank supported by Enable Banking in your region.
 
+Check out the official guide [here](https://enablebanking.com/docs/api/quick-start/#registering-an-application).
+
 Create `~/.config/banker/config.toml` (or pass another path with `--config`). Keep this file and your private key out of version control. Replace the example values with your own Enable Banking application details and the actual ASPSP name/country returned by the service:
 
 ```toml
