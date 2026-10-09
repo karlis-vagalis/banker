@@ -133,6 +133,15 @@ impl ResourceType {
             ResourceType::Transaction => "transaction",
         }
     }
+
+    /// Plural resource type used by the database metadata schema discriminator.
+    pub fn plural_name(&self) -> &'static str {
+        match self {
+            ResourceType::Account => "accounts",
+            ResourceType::Balance => "balances",
+            ResourceType::Transaction => "transactions",
+        }
+    }
 }
 
 #[derive(Clone)]

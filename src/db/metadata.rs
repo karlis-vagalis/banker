@@ -17,7 +17,7 @@ pub async fn upsert_metadata_schema(
              json_schema = excluded.json_schema,
              updated_at = excluded.updated_at",
     )
-    .bind(resource_type.name())
+    .bind(resource_type.plural_name())
     .bind(json_schema.to_string())
     .bind(now.clone())
     .bind(now)
@@ -32,7 +32,7 @@ pub async fn get_metadata_schema(
 ) -> Result<Option<Value>, AppError> {
     let row: Option<(String,)> =
         sqlx::query_as("SELECT json_schema FROM metadata_schemas WHERE target_type = ?1")
-            .bind(resource_type.name())
+            .bind(resource_type.plural_name())
             .fetch_optional(pool)
             .await?;
     match row {
@@ -46,7 +46,7 @@ pub async fn delete_metadata_schema(
     resource_type: &ResourceType,
 ) -> Result<(), AppError> {
     sqlx::query("DELETE FROM metadata_schemas WHERE target_type = ?1")
-        .bind(resource_type.name())
+        .bind(resource_type.plural_name())
         .execute(pool)
         .await?;
     Ok(())
