@@ -233,11 +233,8 @@ pub enum TransactionAction {
 
 #[derive(Subcommand)]
 pub enum SelfFormat {
-    /// Display the full command tree with tree-drawing characters
-    Tree,
-    /// Display commands as a flat list with full paths
-    #[command(visible_alias = "ls")]
-    List,
+    #[command(flatten)]
+    Discovery(clap_discovery::Discovery),
     /// Manage systemd user timer for periodic background sync
     Systemd {
         #[command(subcommand)]

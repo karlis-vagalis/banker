@@ -183,7 +183,7 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
         },
         Commands::Id { action } => id::run(action).await?,
         Commands::CliSelf { action } => match action {
-            SelfFormat::Tree | SelfFormat::List => cli_self::run(action).await?,
+            SelfFormat::Discovery(format) => cli_self::run(format)?,
             SelfFormat::Systemd { action } => systemd::run(action).await?,
         },
     }
