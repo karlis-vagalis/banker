@@ -1,6 +1,7 @@
+use super::time_frame::DateFilterArgs;
 use crate::models::{
     AccountId,
-    transaction_query::{BookingDateRange, FieldSelection, Lookback, RowLimit, TransactionQuery},
+    transaction_query::{BookingDateRange, FieldSelection, RowLimit, TransactionQuery},
 };
 use crate::output::OutputFormat;
 use chrono::NaiveDate;
@@ -12,15 +13,8 @@ pub struct TransactionListArgs {
     /// Restrict to an account (repeat to include multiple accounts)
     #[arg(long = "account")]
     accounts: Vec<AccountId>,
-    /// Inclusive booking date (YYYY-MM-DD)
-    #[arg(long)]
-    from: Option<NaiveDate>,
-    /// Exclusive booking date (YYYY-MM-DD)
-    #[arg(long)]
-    to: Option<NaiveDate>,
-    /// Relative booking-date window, including today (e.g. 30d, 1year)
-    #[arg(long, conflicts_with_all = ["from", "to"])]
-    last: Option<Lookback>,
+    #[command(flatten)]
+    dates: DateFilterArgs<NaiveDate>,
     /// Literal, ASCII-case-insensitive substring in description or counterparty
     #[arg(long)]
     search: Option<String>,
@@ -53,9 +47,9 @@ impl TransactionListArgs {
         if self.all && matches!(format, OutputFormat::Table) {
             return Err("--all requires --jsonl or --lines; tables must be bounded".into());
         }
-        let dates = match self.last {
+        let dates = match self.dates.last {
             Some(last) => BookingDateRange::since(last)?,
-            None => BookingDateRange::new(self.from, self.to)?,
+            None => BookingDateRange::new(self.dates.from, self.dates.to)?,
         };
         let limit = if self.all {
             RowLimit::All

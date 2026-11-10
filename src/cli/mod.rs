@@ -2,7 +2,7 @@ mod metadata;
 mod time_frame;
 mod transaction;
 pub use metadata::{MetadataAction, SchemaAction};
-pub use time_frame::{TimeFrameArgs, time_frame_from_args};
+pub use time_frame::{DateFilterArgs, DateFilterValue, TimeFrameArgs, time_frame_from_args};
 pub use transaction::{TransactionListArgs, TransactionListRequest};
 
 use crate::models::{AccountId, BalanceId, Resource, ResourceType, TransactionId};
@@ -88,7 +88,7 @@ pub enum Commands {
         bank: Option<Vec<String>>,
         /// How many days of transaction history to request
         #[command(flatten)]
-        time_frame_args: Option<TimeFrameArgs>,
+        time_frame_args: TimeFrameArgs,
     },
     /// Work with bank accounts
     Account {

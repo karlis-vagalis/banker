@@ -1,4 +1,4 @@
-use crate::{
+use banker::{
     cli::{Cli, Commands, TransactionAction},
     db::transactions::{self, TransactionRecord},
     models::{
@@ -201,7 +201,7 @@ async fn empty_stream_and_broken_pipe() {
         .unwrap();
     let mut renderer = TransactionRenderer::new(Broken, OutputFormat::Jsonl, None);
     assert!(
-        matches!(renderer.write_record(&row), Err(crate::error::AppError::Io(e)) if e.kind() == std::io::ErrorKind::BrokenPipe)
+        matches!(renderer.write_record(&row), Err(banker::error::AppError::Io(e)) if e.kind() == std::io::ErrorKind::BrokenPipe)
     );
 }
 

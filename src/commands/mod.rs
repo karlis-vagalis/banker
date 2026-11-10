@@ -80,7 +80,7 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 let config = Config::load(config_path)?;
                 let (_name, app_cfg) = config.resolve_app(app.app.as_deref())?;
                 let time_frame =
-                    time_frame_from_args(Some(time_frame_args)).map_err(anyhow::Error::msg)?;
+                    time_frame_from_args(time_frame_args).map_err(anyhow::Error::msg)?;
                 let id = EnableBankingAccountId::try_from(account_id)?;
                 transaction::fetch(&config, app_cfg, &id, time_frame.as_ref(), output.format())
                     .await?;

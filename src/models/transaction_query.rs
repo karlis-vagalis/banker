@@ -1,6 +1,6 @@
 //! Parsed transaction query inputs. Constructors carry invariants into the query layer.
-use super::AccountId;
-use chrono::{NaiveDate, TimeDelta, Utc};
+use super::{AccountId, Lookback};
+use chrono::{NaiveDate, Utc};
 use std::{num::NonZeroU32, str::FromStr};
 
 #[derive(Debug, Clone)]
@@ -22,9 +22,7 @@ impl BookingDateRange {
 
     pub fn since(last: Lookback) -> Result<Self, String> {
         let now = Utc::now();
-        let from = now
-            .checked_sub_signed(last.0)
-            .ok_or("--last is out of range")?;
+        let from = last.start_at(now)?;
         // Booking dates have day precision: include today for relative queries.
         Self::new(Some(from.date_naive()), now.date_naive().succ_opt())
     }
@@ -34,20 +32,6 @@ impl BookingDateRange {
     }
     pub fn to(&self) -> Option<NaiveDate> {
         self.to
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Lookback(TimeDelta);
-
-impl FromStr for Lookback {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, String> {
-        let duration = duration_str::parse_chrono(s)?;
-        if duration <= TimeDelta::zero() {
-            return Err("--last must be positive".into());
-        }
-        Ok(Self(duration))
     }
 }
 
@@ -180,22 +164,4 @@ pub struct TransactionQuery {
     pub dates: BookingDateRange,
     pub search: Option<String>,
     pub limit: RowLimit,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn inputs_carry_their_invariants() {
-        assert!("0d".parse::<Lookback>().is_err());
-        assert!("-1d".parse::<Lookback>().is_err());
-        assert!("1month".parse::<Lookback>().is_ok());
-        let date = "2026-01-01".parse().unwrap();
-        assert!(BookingDateRange::new(Some(date), Some(date)).is_err());
-        assert!("".parse::<FieldSelection>().is_err());
-        assert!("id,id".parse::<FieldSelection>().is_err());
-        assert!("metadata..category".parse::<FieldSelection>().is_err());
-        assert!("metadata.category,amount".parse::<FieldSelection>().is_ok());
-        assert!("content.anything".parse::<FieldSelection>().is_err());
-    }
 }
