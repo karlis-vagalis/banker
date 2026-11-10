@@ -164,6 +164,8 @@ cargo test
 cargo run -- --help
 ```
 
+Reusable seeded end-to-end databases are documented in [tests/fixtures.md](tests/fixtures.md), including custom sizes and the optional 100,000-transaction test.
+
 The Enable Banking client is generated at build time from `enablebanking-api.yaml`.
 
 ## License
