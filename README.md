@@ -156,7 +156,13 @@ Use `banker account metadata --help` (or the balance/transaction equivalents) fo
 
 ## Try synthetic data
 
-From a source checkout, create a persistent example database and explore the CLI without connecting a bank:
+From a source checkout, run a self-contained example that seeds a database, prints real transaction tables, and cleans up automatically:
+
+```sh
+cargo run --example hello
+```
+
+To keep a larger example database and run your own commands:
 
 ```sh
 CONFIG=$(cargo run --quiet --example transaction-playground -- --pine-transactions 100000)

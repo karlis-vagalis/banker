@@ -1,4 +1,14 @@
-# Transaction playground
+# Runnable examples
+
+## Immediate demo
+
+```sh
+cargo run --example hello
+```
+
+This single command seeds 11,110 synthetic transactions across 8 accounts and 4 banks, then prints real transaction tables: all 10 Birch transactions with mixed currencies/metadata, and the newest 5 Pine transactions from its 10,000-record history. It calls the normal CLI parser and dispatcher, needs no configuration, and deletes the generated database on exit.
+
+## Persistent transaction playground
 
 Create synthetic data using the same generator as the end-to-end tests, then run the real CLI against it. No bank connection, credentials, or changes to your normal configuration are required.
 
