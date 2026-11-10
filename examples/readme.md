@@ -1,12 +1,23 @@
 # Runnable examples
 
-## Immediate demo
+## Transaction commands
 
 ```sh
-cargo run --example hello
+cargo run --example transactions -- --help
+cargo run --example transactions -- list --help
+cargo run --example transactions -- accounts
+cargo run --example transactions -- list --bank birch
+cargo run --example transactions -- list --bank pine --limit 10 \
+  --fields id,date,amount,currency,metadata.category,metadata.nested.weight
+cargo run --example transactions -- list --from 2025-02-01 --to 2025-03-01 --search household --jsonl
+cargo run --example transactions -- --pine-transactions 100000 list --bank pine --all --jsonl
 ```
 
-This single command seeds 11,110 synthetic transactions across 8 accounts and 4 banks, then prints real transaction tables: all 10 Birch transactions with mixed currencies/metadata, and the newest 5 Pine transactions from its 10,000-record history. It calls the normal CLI parser and dispatcher, needs no configuration, and deletes the generated database on exit.
+Use a transaction ID from `list` with `cargo run --example transactions -- show <TRANSACTION-ID>`. The subcommands reuse the real CLI argument types and dispatcher, so filtering, field selection, and output formats behave like the main application.
+
+Each invocation seeds a fresh deterministic database (default: 11,110 transactions across 8 accounts and 4 banks), runs your chosen subcommand, and deletes the generated files. No config setup is required. Use the same `--pine-transactions` and `--accounts-per-bank` values between commands so IDs refer to the same dataset. Example-size options are global and can appear before or after the subcommand. Help and argument-syntax errors are handled by Clap before seeding.
+
+For data that survives between invocations, use the persistent playground below.
 
 ## Persistent transaction playground
 

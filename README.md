@@ -156,10 +156,13 @@ Use `banker account metadata --help` (or the balance/transaction equivalents) fo
 
 ## Try synthetic data
 
-From a source checkout, run a self-contained example that seeds a database, prints real transaction tables, and cleans up automatically:
+From a source checkout, run example subcommands against a freshly seeded database, with automatic cleanup:
 
 ```sh
-cargo run --example hello
+cargo run --example transactions -- accounts
+cargo run --example transactions -- list --bank pine --limit 10
+cargo run --example transactions -- list --fields id,date,amount,currency,metadata.category
+cargo run --example transactions -- --help
 ```
 
 To keep a larger example database and run your own commands:
