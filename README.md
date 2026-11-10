@@ -154,6 +154,18 @@ Use `banker account metadata --help` (or the balance/transaction equivalents) fo
 - Syncing sends requests to Enable Banking and retrieves financial data from the providers you authorize. Treat the database, session file, configuration, and backups as sensitive. Protect them with appropriate filesystem permissions and disk encryption.
 - Banker is an early-stage project. Review the code and your provider's terms before connecting a real account; use it at your own risk.
 
+## Try synthetic data
+
+From a source checkout, create a persistent example database and explore the CLI without connecting a bank:
+
+```sh
+CONFIG=$(cargo run --quiet --example transaction-playground -- --pine-transactions 100000)
+cargo run -- --config "$CONFIG" account list
+cargo run -- --config "$CONFIG" transaction list --bank pine --limit 10
+```
+
+This creates 8 accounts across 4 fictional banks, with 101,110 transactions and mixed metadata/currencies. See [examples/readme.md](examples/readme.md) for more commands, smaller datasets, and cleanup instructions.
+
 ## Development
 
 Building and testing from source requires a Rust toolchain supporting edition 2024; install one with [rustup](https://rustup.rs/).
