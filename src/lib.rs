@@ -7,3 +7,6 @@ pub mod db;
 mod error;
 mod models;
 mod output;
+
+#[cfg(test)]
+mod transaction_query_tests;

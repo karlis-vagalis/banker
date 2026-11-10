@@ -21,6 +21,8 @@ CREATE TABLE transactions (
 ) STRICT;
 
 CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+CREATE INDEX idx_transactions_booking_date ON transactions(json_extract(content, '$.booking_date') DESC, id DESC);
+CREATE INDEX idx_transactions_account_booking_date ON transactions(account_id, json_extract(content, '$.booking_date') DESC, id DESC);
 
 CREATE UNIQUE INDEX idx_transactions_account_entry_ref 
 ON transactions(account_id, entry_reference) 
