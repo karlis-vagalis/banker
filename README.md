@@ -159,21 +159,21 @@ Use `banker account metadata --help` (or the balance/transaction equivalents) fo
 From a source checkout, run example subcommands against a freshly seeded database, with automatic cleanup:
 
 ```sh
-cargo run --example transactions -- accounts
-cargo run --example transactions -- list --bank pine --limit 10
-cargo run --example transactions -- list --fields id,date,amount,currency,metadata.category
-cargo run --example transactions -- --help
+cargo run --example demo -- account list
+cargo run --example demo -- transaction list --bank pine --limit 10
+cargo run --example demo -- transaction list --fields id,date,amount,currency,metadata.category
+cargo run --example demo -- --help
 ```
 
 To keep a larger example database and run your own commands:
 
 ```sh
-CONFIG=$(cargo run --quiet --example transaction-playground -- --pine-transactions 100000)
+CONFIG=$(cargo run --quiet --example transaction-playground)
 cargo run -- --config "$CONFIG" account list
 cargo run -- --config "$CONFIG" transaction list --bank pine --limit 10
 ```
 
-This creates 8 accounts across 4 fictional banks, with 101,110 transactions and mixed metadata/currencies. See [examples/readme.md](examples/readme.md) for more commands, smaller datasets, and cleanup instructions.
+This creates 8 accounts across 4 fictional banks, with 11,110 transactions and mixed metadata/currencies. See [examples/readme.md](examples/readme.md) for more commands and cleanup instructions.
 
 ## Development
 

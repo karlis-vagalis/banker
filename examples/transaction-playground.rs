@@ -6,27 +6,16 @@ mod seed;
 use anyhow::Result;
 use clap::Parser;
 use seed::{SeedSpec, seeded_database};
-use std::{io::Write, num::NonZeroU8};
+use std::io::Write;
 
 #[derive(Parser)]
 #[command(about = "Create a synthetic Banker database; stdout is its config path")]
-struct Args {
-    /// Number of transactions in the largest bank (others have 10, 100, and 1,000)
-    #[arg(long, default_value_t = 10_000)]
-    pine_transactions: u32,
-    /// Accounts per bank; transaction totals are split across them
-    #[arg(long, default_value = "2")]
-    accounts_per_bank: NonZeroU8,
-}
+struct Args {}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Args::parse();
-    let fixture = seeded_database(SeedSpec::tiers(
-        args.accounts_per_bank,
-        args.pine_transactions,
-    ))
-    .await?;
+    Args::parse();
+    let fixture = seeded_database(SeedSpec::default()).await?;
     eprintln!(
         "Created {} synthetic transactions across {} fictional banks.",
         fixture.transaction_count(),

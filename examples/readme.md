@@ -1,21 +1,21 @@
 # Runnable examples
 
-## Transaction commands
+## Real CLI with seeded data
 
 ```sh
-cargo run --example transactions -- --help
-cargo run --example transactions -- list --help
-cargo run --example transactions -- accounts
-cargo run --example transactions -- list --bank birch
-cargo run --example transactions -- list --bank pine --limit 10 \
+cargo run --example demo -- --help
+cargo run --example demo -- transaction list --help
+cargo run --example demo -- account list
+cargo run --example demo -- transaction list --bank birch
+cargo run --example demo -- transaction list --bank pine --limit 10 \
   --fields id,date,amount,currency,metadata.category,metadata.nested.weight
-cargo run --example transactions -- list --from 2025-02-01 --to 2025-03-01 --search household --jsonl
-cargo run --example transactions -- --pine-transactions 100000 list --bank pine --all --jsonl
+cargo run --example demo -- transaction list --from 2025-02-01 --to 2025-03-01 --search household --jsonl
+cargo run --example demo -- transaction list --bank pine --all --jsonl
 ```
 
-Use a transaction ID from `list` with `cargo run --example transactions -- show <TRANSACTION-ID>`. The subcommands reuse the real CLI argument types and dispatcher, so filtering, field selection, and output formats behave like the main application.
+Use a transaction ID from `transaction list` with `cargo run --example demo -- transaction show <TRANSACTION-ID>`. Everything after `--` is parsed by the actual Banker CLI parser and executed by its normal dispatcher. There is no example-specific CLI.
 
-Each invocation seeds a fresh deterministic database (default: 11,110 transactions across 8 accounts and 4 banks), runs your chosen subcommand, and deletes the generated files. No config setup is required. Use the same `--pine-transactions` and `--accounts-per-bank` values between commands so IDs refer to the same dataset. Example-size options are global and can appear before or after the subcommand. Help and argument-syntax errors are handled by Clap before seeding.
+Each invocation seeds the same deterministic database (11,110 transactions across 8 accounts and 4 banks), runs your chosen subcommand, and deletes the generated files. No config setup is required, and IDs are stable between invocations. There are no example-only dataset flags or renamed subcommands. For safety, the demo allows local read commands (`transaction list/show`, `account list`, `balance list/current`) and supplies its own config; explicit `--config` overrides and other operations are rejected before seeding. Help and argument-syntax errors are handled by Clap before seeding.
 
 For data that survives between invocations, use the persistent playground below.
 
@@ -35,17 +35,7 @@ cargo run -- --config "$CONFIG" transaction list --bank pine --limit 10
 
 The example writes **only the generated config path to stdout**, so it can be captured in `CONFIG`. Dataset details, account IDs, and suggested commands go to stderr. Each run creates a new temporary directory and deliberately keeps it after exit. The config uses an absolute database path, so it works from another directory too.
 
-For a larger dataset:
-
-```sh
-# 100,000 transactions in Pine, plus 10 / 100 / 1,000 in the other banks.
-# Still 8 accounts and 4 banks; 101,110 transactions in total.
-CONFIG=$(cargo run --quiet --example transaction-playground -- --pine-transactions 100000)
-
-# Optionally change the number of accounts per bank (must be nonzero).
-CONFIG=$(cargo run --quiet --example transaction-playground -- \
-  --pine-transactions 100000 --accounts-per-bank 2)
-```
+Both examples use the shared default fixture. Custom sizes belong in the fixture specification, not in CLI examples; see [tests/fixtures.md](../tests/fixtures.md).
 
 ## Commands to explore
 
