@@ -1,6 +1,6 @@
 # Seeded integration-test database
 
-`tests/support/mod.rs` provides one reusable entry point (implemented in `tests/support/seed.rs`, shared with the manual playground):
+`tests/support/mod.rs` provides one reusable entry point (implemented in `tests/support/seed.rs`, shared with the CLI demo):
 
 ```rust
 mod support;
@@ -57,7 +57,7 @@ let fixture = seeded_database(spec).await.unwrap();
 
 The first bank receives account counts `[3, 2, 2]`. A bank transaction count of zero creates empty accounts. Layouts must contain at least one bank, with no duplicate bank identities; account counts use `NonZeroU8`, so zero accounts cannot be represented.
 
-Every fixture owns its own temporary directory, SQLite file, and config, enabling parallel tests without touching user data. Dropping the fixture removes the directory. Calling `persist()` explicitly keeps the directory instead and returns its path; the [transaction playground](../examples/readme.md) uses this for manual CLI exploration. Close any pools you open against it before dropping it. Application credentials are dummy values, and the fixture API URL points at loopback port 9 rather than the live service; this fixture is intended for local commands, not API/sync tests.
+Every fixture owns its own temporary directory, SQLite file, and config, enabling parallel tests without touching user data. Dropping the fixture removes the directory. The [CLI demo](../examples/readme.md) uses the same automatic cleanup. Close any pools you open against it before dropping it. Application credentials are dummy values, and the fixture API URL points at loopback port 9 rather than the live service; this fixture is intended for local commands, not API/sync tests.
 
 ## Running tests
 

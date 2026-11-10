@@ -396,38 +396,6 @@ async fn hundred_thousand_transactions_can_be_streamed_from_a_custom_seed() {
     assert_eq!(count, 100_000);
 }
 
-#[tokio::test]
-async fn persisted_seed_survives_drop_and_can_be_browsed_with_the_cli() {
-    let spec = SeedSpec::new([BankSeed::new(
-        TestBank::Birch,
-        NonZeroU8::new(2).unwrap(),
-        10,
-    )])
-    .unwrap();
-    let fixture = seeded_database(spec).await.unwrap();
-    let config = fixture.config_path();
-    let directory = fixture.persist();
-    // Persistence is explicit; this test removes its generated directory after use.
-    assert!(directory.join("data.db").is_file());
-    assert!(config.is_file());
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_banker"))
-        .arg("--config")
-        .arg(&config)
-        .args(["transaction", "list", "--all", "--jsonl"])
-        .output()
-        .unwrap();
-    std::fs::remove_dir_all(&directory).unwrap();
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        String::from_utf8(output.stdout).unwrap().lines().count(),
-        10
-    );
-}
-
 #[test]
 fn seed_spec_rejects_empty_and_duplicate_bank_layouts() {
     assert!(SeedSpec::new([]).is_err());

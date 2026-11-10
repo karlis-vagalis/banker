@@ -165,15 +165,7 @@ cargo run --example demo -- transaction list --fields id,date,amount,currency,me
 cargo run --example demo -- --help
 ```
 
-To keep a larger example database and run your own commands:
-
-```sh
-CONFIG=$(cargo run --quiet --example transaction-playground)
-cargo run -- --config "$CONFIG" account list
-cargo run -- --config "$CONFIG" transaction list --bank pine --limit 10
-```
-
-This creates 8 accounts across 4 fictional banks, with 11,110 transactions and mixed metadata/currencies. See [examples/readme.md](examples/readme.md) for more commands and cleanup instructions.
+The demo uses 8 accounts across 4 fictional banks, with 11,110 transactions and mixed metadata/currencies. Generated files are deleted automatically after each command. See [examples/readme.md](examples/readme.md) for more commands.
 
 ## Development
 

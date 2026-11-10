@@ -1,4 +1,4 @@
-//! Deterministic database seeding shared by integration tests and the manual playground.
+//! Deterministic database seeding shared by integration tests and the CLI demo.
 use anyhow::{Context, Result, ensure};
 use banker::{
     db::Database,
@@ -145,11 +145,6 @@ impl SeededDatabase {
             .flat_map(|b| &b.accounts)
             .map(|a| u64::from(a.transaction_count))
             .sum()
-    }
-    /// Keep the generated directory for manual CLI exploration instead of deleting it.
-    /// The database and config retain their original absolute paths.
-    pub fn persist(self) -> PathBuf {
-        self.directory.keep()
     }
 }
 

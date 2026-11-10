@@ -1,6 +1,6 @@
-# Runnable examples
+# Seeded CLI demo
 
-## Real CLI with seeded data
+Run the real CLI against synthetic data, without configuration or bank credentials:
 
 ```sh
 cargo run --example demo -- --help
@@ -10,64 +10,30 @@ cargo run --example demo -- transaction list --bank birch
 cargo run --example demo -- transaction list --bank pine --limit 10 \
   --fields id,date,amount,currency,metadata.category,metadata.nested.weight
 cargo run --example demo -- transaction list --from 2025-02-01 --to 2025-03-01 --search household --jsonl
-cargo run --example demo -- transaction list --bank pine --all --jsonl
+cargo run --example demo -- transaction list --bank pine --all --jsonl > transactions.jsonl
 ```
 
-Use a transaction ID from `transaction list` with `cargo run --example demo -- transaction show <TRANSACTION-ID>`. Everything after `--` is parsed by the actual Banker CLI parser and executed by its normal dispatcher. There is no example-specific CLI.
+Everything after `--` uses the actual Banker CLI parser and normal dispatcher. There are no example-only dataset flags or renamed subcommands.
 
-Each invocation seeds the same deterministic database (11,110 transactions across 8 accounts and 4 banks), runs your chosen subcommand, and deletes the generated files. No config setup is required, and IDs are stable between invocations. There are no example-only dataset flags or renamed subcommands. For safety, the demo allows local read commands (`transaction list/show`, `account list`, `balance list/current`) and supplies its own config; explicit `--config` overrides and other operations are rejected before seeding. Help and argument-syntax errors are handled by Clap before seeding.
-
-For data that survives between invocations, use the persistent playground below.
-
-## Persistent transaction playground
-
-Create synthetic data using the same generator as the end-to-end tests, then run the real CLI against it. No bank connection, credentials, or changes to your normal configuration are required.
-
-Run these commands from the project root in Bash or another POSIX shell:
+Use an account ID from `account list` with `transaction list --account <ACCOUNT-ID>`, or a transaction ID from `transaction list` with `transaction show <TRANSACTION-ID>`:
 
 ```sh
-# Default: 8 accounts, 4 banks, 11,110 transactions in total.
-CONFIG=$(cargo run --quiet --example transaction-playground)
-
-cargo run -- --config "$CONFIG" account list
-cargo run -- --config "$CONFIG" transaction list --bank pine --limit 10
+cargo run --example demo -- transaction list --account <ACCOUNT-ID> --limit 10
+cargo run --example demo -- transaction show <TRANSACTION-ID>
 ```
 
-The example writes **only the generated config path to stdout**, so it can be captured in `CONFIG`. Dataset details, account IDs, and suggested commands go to stderr. Each run creates a new temporary directory and deliberately keeps it after exit. The config uses an absolute database path, so it works from another directory too.
+Replace the placeholders before running those commands. For quieter Cargo output, use `cargo run --quiet --example demo -- ...`.
 
-Both examples use the shared default fixture. Custom sizes belong in the fixture specification, not in CLI examples; see [tests/fixtures.md](../tests/fixtures.md).
+## Dataset and lifecycle
 
-## Commands to explore
+Each invocation seeds the same deterministic database: **11,110 transactions across 8 accounts and 4 fictional banks**. Bank keys are `birch`, `linden`, `oak`, and `pine`, with 10, 100, 1,000, and 10,000 transactions respectively.
 
-```sh
-# Compact output with selected annotations.
-cargo run -- --config "$CONFIG" transaction list --bank pine \
-  --fields id,date,amount,currency,metadata.category,metadata.nested.weight
+Currencies include EUR, USD, GBP, and CHF. Records mix credits/debits, missing metadata, empty metadata objects, nested annotations, tags, explicit nulls, Unicode, multiline descriptions, pending statuses, and missing booking dates/references.
 
-# Description search within an explicit booking-date range.
-cargo run -- --config "$CONFIG" transaction list \
-  --from 2025-02-01 --to 2025-03-01 --search household --jsonl
+Dates start at **2025-01-01** and span 400 days. Recent `--last` windows may return no matches; use the absolute date bounds above to inspect populated periods.
 
-# Use an account ID printed by the example or account list.
-cargo run -- --config "$CONFIG" transaction list --account <ACCOUNT-ID> --limit 10
+IDs are stable between invocations. The generated database and config are deleted automatically after every command; no manual cleanup is needed.
 
-# Use a transaction ID from transaction list for full bank content and metadata.
-cargo run -- --config "$CONFIG" transaction show <TRANSACTION-ID>
+For safety, the demo supports local read commands (`transaction list/show`, `account list`, `balance list/current`) and supplies its own isolated config. Explicit `--config` overrides and other operations are rejected before seeding. Balances and authorization sessions are not seeded, so balance commands return empty results. Help and argument-syntax errors are handled before seeding.
 
-# Export the largest bank without the default 50-row limit.
-cargo run -- --config "$CONFIG" transaction list --bank pine --all --jsonl > transactions.jsonl
-```
-
-Replace `<ACCOUNT-ID>` and `<TRANSACTION-ID>` before running those commands. For a quieter shell after the first compilation, use `cargo run --quiet -- ...`.
-
-## What's in the database?
-
-Bank keys: `birch`, `linden`, `oak`, and `pine`. Amounts use EUR, USD, GBP, and CHF, with credits and debits. Records mix absent metadata, empty metadata objects, populated nested annotations, tags, and explicit nulls. Descriptions include Unicode, newlines, and delimiters. Some records are pending or lack booking dates/references.
-
-Dates are deterministic, starting at **2025-01-01** and spanning 400 days. Recent `--last` windows may return no matches; use the absolute bounds above to inspect populated periods.
-
-The fixture is for **local commands only**. API/auth/sync commands are not demonstrated: the config has dummy credentials and points at loopback, not Enable Banking. Account and transaction data are seeded; balances and authorization sessions are not.
-
-Files are not automatically removed after the example exits. Delete the generated directory printed by the example when finished. Re-running the example creates another independent dataset rather than overwriting a previous one.
-
-For fixture customization in tests, see [tests/fixtures.md](../tests/fixtures.md). The implementation is shared through `tests/support/seed.rs`; no duplicate generator or production CLI seeding command is added.
+The generator is shared with end-to-end tests through `tests/support/seed.rs`. For custom test layouts and the optional 100,000-transaction test, see [tests/fixtures.md](../tests/fixtures.md).

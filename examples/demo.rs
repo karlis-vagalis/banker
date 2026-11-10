@@ -1,6 +1,6 @@
 //! Run the actual CLI against synthetic data: `cargo run --example demo -- transaction list`.
 #[path = "../tests/support/seed.rs"]
-#[allow(dead_code)] // Other fixture consumers use its manifest and persistence APIs.
+#[allow(dead_code)] // Integration tests also use the fixture's manifest and directory APIs.
 mod seed;
 
 use anyhow::{Result, ensure};
