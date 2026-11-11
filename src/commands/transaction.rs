@@ -1,11 +1,11 @@
 use crate::api::EnableBankingClient;
 use crate::api::models::EnableBankingAccountId;
-use crate::cli::MetadataAction;
+use crate::cli::{MetadataAction, TransactionListRequest};
 use crate::config::{ApplicationConfig, Config};
-use crate::db::row::TransactionRow;
 use crate::error::AppError;
-use crate::models::{ResourceType, TimeFrame, TransactionId};
-use crate::output::{OutputFormat, print_api_transactions, print_db_transactions};
+use crate::models::{ResourceType, TimeFrame, TransactionId, transaction_query::RowLimit};
+use crate::output::{OutputFormat, TransactionRenderer, print_api_transactions, write_detail};
+use futures_util::TryStreamExt;
 
 pub async fn fetch(
     config: &Config,
@@ -15,7 +15,6 @@ pub async fn fetch(
     format: OutputFormat,
 ) -> Result<(), AppError> {
     let client = EnableBankingClient::new(config, app_cfg).await?;
-
     let txs = client
         .get_account_transactions(account_id, time_frame)
         .await?;
@@ -25,29 +24,61 @@ pub async fn fetch(
 
 pub async fn list_local(
     database: &crate::db::Database,
-    bank_name: Option<&str>,
-    bank_country: Option<&str>,
+    bank: Option<(&str, &str)>,
+    request: TransactionListRequest,
+) -> Result<(), AppError> {
+    let stdout = std::io::stdout();
+    let writer = std::io::BufWriter::new(stdout.lock());
+    let (query, fields, format) = request.into_parts();
+    let mut renderer = TransactionRenderer::new(writer, format, fields);
+    let mut sql = crate::db::transactions::list_query(&query, bank);
+    let mut rows = sql.build_query_as().fetch(database.pool());
+    let mut count = 0u64;
+    let mut more = false;
+    let result = async {
+        while let Some(row) = rows.try_next().await? {
+            if let RowLimit::Bounded(limit) = query.limit
+                && count == u64::from(limit.get())
+            {
+                more = true;
+                break;
+            }
+            renderer.write_record(&row)?;
+            count += 1;
+        }
+        renderer.finish()?;
+        Ok::<_, AppError>(())
+    }
+    .await;
+    match result {
+        Err(AppError::Io(e)) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+        Err(error) => Err(error),
+        Ok(()) => {
+            if more {
+                eprintln!(
+                    "Showing {count} records; more results available. Increase --limit or use --all with --jsonl/--lines."
+                );
+            }
+            Ok(())
+        }
+    }
+}
+
+pub async fn show_local(
+    database: &crate::db::Database,
+    id: TransactionId,
     format: OutputFormat,
 ) -> Result<(), AppError> {
-    let rows: Vec<TransactionRow> = sqlx::query_as(
-        "SELECT t.id, t.account_id, t.entry_reference, t.content, t.content_hash, t.inserted_at, t.updated_at
-         FROM transactions t
-         JOIN accounts a ON a.id = t.account_id
-         WHERE (?1 IS NULL OR (a.aspsp_name = ?1 AND a.aspsp_country = ?2))
-         ORDER BY json_extract(t.content, '$.booking_date') ASC",
-    )
-    .bind(bank_name)
-    .bind(bank_country)
-    .fetch_all(database.pool())
-    .await?;
-
-    if rows.is_empty() {
-        tracing::warn!("no transactions in database — run `banker sync` first");
-        return Ok(());
+    let label = id.to_string();
+    let row = crate::db::transactions::find(database.pool(), id)
+        .await?
+        .ok_or_else(|| AppError::Other(format!("transaction not found: {label}")))?;
+    let stdout = std::io::stdout();
+    let mut writer = std::io::BufWriter::new(stdout.lock());
+    match write_detail(&mut writer, &row, format) {
+        Err(AppError::Io(e)) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+        result => result,
     }
-
-    print_db_transactions(&rows, format)?;
-    Ok(())
 }
 
 pub async fn metadata_local(

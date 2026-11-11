@@ -1,5 +1,6 @@
 mod metadata;
 pub mod row;
+pub mod transactions;
 pub use metadata::*;
 
 use crate::error::AppError;

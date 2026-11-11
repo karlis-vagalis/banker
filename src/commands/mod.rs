@@ -80,21 +80,33 @@ async fn dispatch_inner(cli: Cli, config_path: &std::path::Path) -> anyhow::Resu
                 let config = Config::load(config_path)?;
                 let (_name, app_cfg) = config.resolve_app(app.app.as_deref())?;
                 let time_frame =
-                    time_frame_from_args(Some(time_frame_args)).map_err(anyhow::Error::msg)?;
+                    time_frame_from_args(time_frame_args).map_err(anyhow::Error::msg)?;
                 let id = EnableBankingAccountId::try_from(account_id)?;
                 transaction::fetch(&config, app_cfg, &id, time_frame.as_ref(), output.format())
                     .await?;
             }
-            TransactionAction::List { bank, output } => {
+            TransactionAction::List {
+                bank,
+                output,
+                query,
+            } => {
+                let request = query
+                    .parse_request(output.format())
+                    .map_err(anyhow::Error::msg)?;
                 with_database(config_path, |config, database| async move {
                     let bank_filter = local::resolve_filter_bank(&config, bank.bank.as_deref())?;
                     transaction::list_local(
                         &database,
-                        bank_filter.as_ref().map(|(n, _)| n.as_str()),
-                        bank_filter.as_ref().map(|(_, c)| c.as_str()),
-                        output.format(),
+                        bank_filter.as_ref().map(|(n, c)| (n.as_str(), c.as_str())),
+                        request,
                     )
                     .await
+                })
+                .await?;
+            }
+            TransactionAction::Show { id, output } => {
+                with_database(config_path, |_, database| async move {
+                    transaction::show_local(&database, id, output.format()).await
                 })
                 .await?;
             }

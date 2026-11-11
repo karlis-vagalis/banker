@@ -1,7 +1,9 @@
 mod metadata;
 mod time_frame;
+mod transaction;
 pub use metadata::{MetadataAction, SchemaAction};
-pub use time_frame::{TimeFrameArgs, time_frame_from_args};
+pub use time_frame::{DateFilterArgs, DateFilterValue, TimeFrameArgs, time_frame_from_args};
+pub use transaction::{TransactionListArgs, TransactionListRequest};
 
 use crate::models::{AccountId, BalanceId, Resource, ResourceType, TransactionId};
 use crate::output::OutputFormat;
@@ -86,7 +88,7 @@ pub enum Commands {
         bank: Option<Vec<String>>,
         /// How many days of transaction history to request
         #[command(flatten)]
-        time_frame_args: Option<TimeFrameArgs>,
+        time_frame_args: TimeFrameArgs,
     },
     /// Work with bank accounts
     Account {
@@ -216,11 +218,19 @@ pub enum TransactionAction {
         #[command(flatten)]
         time_frame_args: TimeFrameArgs,
     },
-    /// List stored transactions from the database (local)
+    /// List stored transactions (newest first; default: 50 records)
     #[command(visible_alias = "ls")]
     List {
         #[command(flatten)]
         bank: BankArg,
+        #[command(flatten)]
+        output: OutputArg,
+        #[command(flatten)]
+        query: TransactionListArgs,
+    },
+    /// Inspect a complete local transaction, including metadata
+    Show {
+        id: TransactionId,
         #[command(flatten)]
         output: OutputArg,
     },
